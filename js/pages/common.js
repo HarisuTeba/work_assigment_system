@@ -12,7 +12,7 @@ function kartuInstruksi(pr, p = null, tag = 'h1') {
   const pemberi = Store.get('users', pr.pemberi_id);
   const kepada = Logic.penugasanPerintah(pr.id).map(x => Store.get('users', x.penerima_id).nama).join(', ');
   const field = (label, isi) => `<div><dt>${label}</dt><dd>${isi}</dd></div>`;
-  const baris = (label, sub, v) => `<dt>${label}<small>${sub}</small></dt><dd>${esc(v)}</dd>`;
+  const baris = (label, v) => `<dt>${label}</dt><dd>${esc(v)}</dd>`;
   const cap = p ? stempel(p) : '';
   return `<article class="memo" aria-label="Surat perintah ${esc(pr.judul)}">
     ${cap ? `<div class="memo-stamp">${cap}</div>` : ''}
@@ -30,12 +30,11 @@ function kartuInstruksi(pr, p = null, tag = 'h1') {
     </dl>
     ${pr.jenis === 'Lisan' ? `<p class="memo-note"><strong>Catatan perintah lisan:</strong> ${esc(pr.catatan_lisan)}</p>` : ''}
     <dl class="w5-grid">
-      ${baris('Apa', 'what', pr.apa)}
-      ${baris('Mengapa', 'why', pr.mengapa)}
-      ${baris('Di mana', 'where', pr.di_mana)}
-      ${baris('Bagaimana', 'how', pr.bagaimana)}
+      ${baris('Apa', pr.apa)}
+      ${baris('Mengapa', pr.mengapa)}
+      ${baris('Di mana', pr.di_mana)}
+      ${baris('Bagaimana', pr.bagaimana)}
     </dl>
-    <p class="muted small">Diterbitkan ${fmtWaktu(pr.dibuat_pada)}. Siapa dan kapan tercantum pada kolom Kepada dan Tenggat.</p>
   </article>`;
 }
 
@@ -106,7 +105,7 @@ function daftarLangkah(p, bisaKerja) {
         <input name="catatan" placeholder="Catatan singkat (opsional)" aria-label="Catatan langkah ${i + 1}">
         <button class="btn btn-primary">Tandai selesai</button></form>`;
     } else if (st === 'locked') {
-      aksi = '<div class="small">Terkunci sampai langkah sebelumnya selesai</div>';
+      aksi = '<div class="small">Terkunci</div>';
     }
     return `<li class="step step-${st}">
       <div class="step-num" aria-label="Langkah ${i + 1}${r.progres.selesai ? ', selesai' : ''}">${i + 1}</div>
@@ -152,9 +151,8 @@ Pages.login = {
     ];
     return `<div class="login-wrap">
       <section class="login-intro">
-        <span class="wordmark">Perintah&amp;Tugas<span>Buku perintah kantor</span></span>
+        <span class="wordmark">Perintah&amp;Tugas</span>
         <h1>Perintah yang jelas, laporan yang tercatat.</h1>
-        <p>Sistem pemberian perintah atasan ke bawahan, lengkap dengan konfirmasi, pelaporan, dan evaluasinya.</p>
         <ol>${alur.map((t, i) => `<li><b>${i + 1}</b><span>${t}</span></li>`).join('')}</ol>
       </section>
       <section class="login-form">
@@ -165,7 +163,7 @@ Pages.login = {
           <button class="btn btn-primary btn-block">Masuk</button>
         </form>
         <div>
-          <p class="small muted">Akun demo, semua dengan password <code>${PASSWORD_DEMO}</code>. Klik untuk mengisi.</p>
+          <p class="small muted">Akun demo · password <code>${PASSWORD_DEMO}</code></p>
           <div class="demo-list">${demo.map(([u, l]) => `<button class="demo-item" data-action="isi-demo" data-u="${u}"><strong>${u}</strong><span>${l}</span></button>`).join('')}</div>
         </div>
         <div><button class="btn-text" data-action="reset-demo">Reset data demo</button></div>
@@ -281,7 +279,6 @@ Pages.peringkat = {
   render(user) {
     return `<section class="card">
       <div class="card-head"><h2>Divisi ${esc(Logic.divisiNama(user.divisi_id))}</h2></div>
-      <p class="muted small">Poin berasal dari evaluasi (rata-rata skor × 10, +10 jika tepat waktu) dan pujian atasan.</p>
       ${tabelPeringkat(user.divisi_id, user.id)}
     </section>`;
   },

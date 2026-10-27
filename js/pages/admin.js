@@ -9,7 +9,7 @@ Pages.dashAdmin = {
         ${statCard('Divisi', Store.all('divisi').length, '', '#/admin/divisi')}
         ${statCard('Atasan aktif', hitung('atasan'), '', '#/admin/pengguna')}
         ${statCard('Bawahan aktif', hitung('bawahan'), '', '#/admin/pengguna')}
-        ${statCard('Perintah dibuat', Store.all('perintah').length, `${pen.length} penugasan`)}
+        ${statCard('Perintah dibuat', Store.all('perintah').length)}
       </div>
       <section class="card">
         <div class="card-head"><h2>Ringkasan per divisi</h2></div>
@@ -73,7 +73,6 @@ Pages.pengguna = {
     return `<section class="card">
       <div class="card-head"><h2>Daftar pengguna</h2>
         <button class="btn btn-primary btn-small" data-action="form-user">Tambah pengguna</button></div>
-      <p class="muted small">Relasi atasan–bawahan ditentukan oleh divisi: atasan memberi perintah ke bawahan di divisinya.</p>
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Nama</th><th>Username</th><th>Peran</th><th>Jabatan</th><th>Divisi</th><th>Status</th><th></th></tr></thead>
         <tbody>${list.map(u => `<tr class="${u.aktif ? '' : 'inactive'}">

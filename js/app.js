@@ -134,7 +134,7 @@ const App = {
 
     return `<div class="shell">
       <aside class="sidebar">
-        <a class="wordmark" href="#/dashboard">Perintah&amp;Tugas<span>Buku perintah kantor</span></a>
+        <a class="wordmark" href="#/dashboard">Perintah&amp;Tugas</a>
         <nav aria-label="Menu utama">${menu}</nav>
         <div class="sidebar-foot">
           <a href="#/profil" class="nav-item${path === '/profil' ? ' active' : ''}"><span class="grow">Profil</span></a>
@@ -147,8 +147,7 @@ const App = {
           <button class="menu-btn" data-action="toggle-nav" aria-label="Buka menu">${IKON.menu}</button>
           <div class="dateline">${tanggalPanjang(now())}${u.divisi_id ? ` · Divisi ${esc(Logic.divisiNama(u.divisi_id))}` : ''}</div>
           <a href="#/notifikasi" class="bell" aria-label="Notifikasi${unread ? `, ${unread} belum dibaca` : ''}">${IKON.bel}${unread ? `<span class="bell-count">${unread}</span>` : ''}</a>
-          <a href="#/profil" class="me-chip">${avatar(u)}<span class="me-text"><strong>${esc(u.nama)}</strong>
-            <span class="muted small">${esc(u.jabatan)}</span></span></a>
+          <a href="#/profil" class="me-chip">${avatar(u)}<span class="me-text"><strong>${esc(u.nama)}</strong></span></a>
         </header>
         ${Store.saveFailed ? '<div class="banner warn">Penyimpanan browser diblokir atau penuh. Perubahan hanya bertahan sampai halaman ditutup.</div>' : ''}
         <main class="content">${kepala}${isi}</main>

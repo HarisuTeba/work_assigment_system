@@ -5,7 +5,7 @@ function itemTugas(p) {
   const persen = Logic.persen(p);
   return `<li class="list-row">
     <a class="grow" href="#/tugas/${p.id}"><strong>${esc(pr.judul)}</strong>
-      <div class="muted small">Dari ${esc(namaUser(pr.pemberi_id))} · tenggat ${fmtWaktu(pr.tenggat)} (${sisaWaktu(pr.tenggat)})</div>
+      <div class="muted small">Tenggat ${fmtWaktu(pr.tenggat)}</div>
       <div class="progress-line small">${progressBar(persen)}<span>${persen}%</span></div></a>
     <div class="row-badges">${badgePrioritas(pr.prioritas)}${badgeStatus(p.status)}${badgeTerlambat(p)}</div></li>`;
 }
@@ -19,14 +19,13 @@ Pages.dashBawahan = {
     const perluTindakan = aktif.filter(p => [STATUS.BARU, STATUS.REVISI].includes(p.status));
     const teguranBaru = Store.where('teguran', t => t.penerima_id === user.id && !t.dibaca_pada);
     const nilai = Logic.rataNilai(user.id);
-    const rank = Logic.peringkat(user.divisi_id).findIndex(r => r.user.id === user.id) + 1;
 
     return `${teguranBaru.length ? `<a class="banner warn" href="#/teguran-saya"><strong>Teguran</strong>Anda memiliki ${teguranBaru.length} teguran yang belum dibaca.</a>` : ''}
       ${perluTindakan.length ? `<a class="banner info" href="#/tugas"><strong>Perlu tindakan</strong>${perluTindakan.length} penugasan menunggu konfirmasi atau revisi dari Anda.</a>` : ''}
       <div class="stats">
         ${statCard('Tugas aktif', aktif.length, '', '#/tugas')}
-        ${statCard('Total poin', Logic.totalPoin(user.id), rank ? `peringkat ${rank} di divisi` : '', '#/peringkat')}
-        ${statCard('Nilai rata-rata', fmtSkor(nilai), 'skala 1–5', '#/nilai')}
+        ${statCard('Total poin', Logic.totalPoin(user.id), '', '#/peringkat')}
+        ${statCard('Nilai rata-rata', fmtSkor(nilai), '', '#/nilai')}
         ${statCard('Tugas disetujui', pen.filter(p => p.status === STATUS.DISETUJUI).length, '', '#/nilai')}
       </div>
       <section class="card">
@@ -66,7 +65,7 @@ Pages.kerjakan = {
     if (p.status === STATUS.BARU) {
       tahap = `<section class="card highlight">
         <div class="card-head"><h2>Sudah paham perintah ini?</h2></div>
-        <p>Baca surat perintah di atas. Jika ada yang kurang jelas, ajukan pertanyaan di bawah. Jika sudah jelas, konfirmasi untuk membuka langkah pengerjaan.</p>
+        <p>Ada yang belum jelas? Ajukan pertanyaan di bawah.</p>
         <div class="form-actions start"><button class="btn btn-primary" data-action="konfirmasi" data-pid="${p.id}">Saya paham, mulai kerjakan</button></div>
       </section>`;
     } else if (p.status === STATUS.MENUNGGU) {
@@ -146,7 +145,7 @@ Pages.nilai = {
     const label = { otomatis: 'Poin evaluasi', pujian: 'Pujian', sertifikat: 'Sertifikat Karyawan Teladan' };
     return `<div class="stats">
         ${statCard('Total poin', Logic.totalPoin(user.id))}
-        ${statCard('Nilai rata-rata', fmtSkor(Logic.rataNilai(user.id)), 'evaluasi yang disetujui')}
+        ${statCard('Nilai rata-rata', fmtSkor(Logic.rataNilai(user.id)))}
         ${statCard('Sertifikat', rewards.filter(r => r.jenis === 'sertifikat').length)}
       </div>
       <section class="card"><div class="card-head"><h2>Riwayat evaluasi</h2></div>
@@ -176,7 +175,6 @@ Pages.teguranSaya = {
     const list = Store.where('teguran', t => t.penerima_id === user.id).sort((a, b) => b.dibuat_pada - a.dibuat_pada);
     return `<section class="card">
       <div class="card-head"><h2>Catatan teguran & pembinaan</h2></div>
-      <p class="muted small">Teguran adalah bagian dari pembinaan. Teguran tidak mengurangi poin Anda.</p>
       ${list.length ? `<ul class="list">${list.map(t => `<li class="list-row col${t.dibaca_pada ? '' : ' unread'}">
         <div><span class="status s-teguran">${esc(t.tingkat)}</span> dari <strong>${esc(namaUser(t.pemberi_id))}</strong>
           <span class="muted small">${fmtWaktu(t.dibuat_pada)}</span></div>

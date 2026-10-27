@@ -35,15 +35,14 @@ Pages.dashAtasan = {
       .slice(0, 6);
 
     return `<div class="stats">
-        ${statCard('Penugasan aktif', aktif.length, `${pen.length} total`, '#/perintah')}
-        ${statCard('Menunggu evaluasi', menungguEval.length, 'laporan masuk', '#/evaluasi')}
-        ${statCard('Pertanyaan terbuka', tanyaTerbuka, 'perlu dijawab', '#/perintah')}
-        ${statCard('Terlambat', terlambat.length, 'belum selesai', '#/perintah')}
+        ${statCard('Penugasan aktif', aktif.length, '', '#/perintah')}
+        ${statCard('Menunggu evaluasi', menungguEval.length, '', '#/evaluasi')}
+        ${statCard('Pertanyaan terbuka', tanyaTerbuka, '', '#/perintah')}
+        ${statCard('Terlambat', terlambat.length, '', '#/perintah')}
       </div>
 
       ${saran.length ? `<section class="card alert-card">
         <div class="card-head"><h2>Saran teguran</h2><a href="#/teguran">Kelola teguran</a></div>
-        <p class="muted small">Sistem hanya memberi saran. Keputusan memberi teguran tetap di tangan Anda.</p>
         <ul class="list">${saran.map(s => `<li class="list-row">
           <div>${avatar(s.user)}</div>
           <div class="grow"><strong>${esc(s.user.nama)}</strong><div class="muted small">${esc(s.alasan.join(' · '))}</div></div>
@@ -70,7 +69,6 @@ Pages.dashAtasan = {
         <section class="card">
           <div class="card-head"><h2>Nilai rata-rata per staf</h2></div>
           ${barChart(Logic.bawahanDari(user).map(b => ({ label: b.nama, value: Logic.rataNilai(b.id) })), { max: 5, format: v => v.toFixed(2) })}
-          <p class="muted small">Skala 1–5, dari evaluasi yang disetujui.</p>
         </section>
       </div>`;
   },
@@ -96,8 +94,7 @@ Pages.buatPerintah = {
           <fieldset><legend>Jenis</legend>
             <label class="radio"><input type="radio" name="jenis" value="Tertulis" checked data-change="jenis-perintah"> Tertulis</label>
             <label class="radio"><input type="radio" name="jenis" value="Lisan" data-change="jenis-perintah"> Lisan, dicatat sebagai bukti</label></fieldset>
-          <label>Sifat perintah<select name="sifat">${opsi(SIFAT, 'Perintah langsung')}</select>
-            <span class="hint">Langsung: wajib dilakukan · Permintaan: halus · Anjuran: saran · Sukarela: tawaran</span></label>
+          <label>Sifat perintah<select name="sifat">${opsi(SIFAT, 'Perintah langsung')}</select></label>
           <label>Prioritas<select name="prioritas">${opsi(PRIORITAS, 'Sedang')}</select></label>
         </div>
         <label id="catatan-lisan" hidden>Catatan perintah lisan (bukti tertulis)
@@ -113,7 +110,7 @@ Pages.buatPerintah = {
           <label>Bagaimana — cara & standar hasil<textarea name="bagaimana" rows="2" required></textarea></label>
           <label>Kapan — tenggat<input type="datetime-local" name="tenggat" value="${toLocalInput(besok.getTime())}" required></label>
           <fieldset><legend>Siapa — penerima (boleh lebih dari satu)</legend>
-            ${bawahan.length ? bawahan.map(b => `<label class="check"><input type="checkbox" name="penerima[]" value="${b.id}"> ${esc(b.nama)} <span class="muted small">${esc(b.jabatan)}</span></label>`).join('')
+            ${bawahan.length ? bawahan.map(b => `<label class="check"><input type="checkbox" name="penerima[]" value="${b.id}"> ${esc(b.nama)}</label>`).join('')
               : '<p class="muted">Belum ada bawahan aktif di divisi Anda.</p>'}
           </fieldset>
         </div>
@@ -121,7 +118,6 @@ Pages.buatPerintah = {
 
       <section class="card">
         <div class="card-head"><h2>3. Langkah satu per satu</h2></div>
-        <p class="muted small">Bawahan mengerjakan langkah sesuai urutan. Langkah berikutnya terbuka setelah langkah sebelumnya selesai.</p>
         <ol class="step-inputs" id="langkah-list">${barisLangkah()}${barisLangkah()}</ol>
         <button type="button" class="btn btn-ghost" data-action="tambah-langkah">Tambah langkah</button>
       </section>
@@ -186,7 +182,7 @@ Pages.daftarPerintah = {
       ${list.length ? `<div class="table-wrap"><table class="table">
         <thead><tr><th>Perintah</th><th>Prioritas</th><th>Tenggat</th><th>Penerima</th><th>Status</th></tr></thead>
         <tbody>${list.map(({ pr, pen }) => `<tr class="clickable" data-action="buka" data-href="#/perintah/${pr.id}">
-          <td><a href="#/perintah/${pr.id}"><strong>${esc(pr.judul)}</strong></a><div class="muted small">${nomorSurat(pr)} · ${esc(pr.jenis)} · ${esc(pr.sifat)}</div></td>
+          <td><a href="#/perintah/${pr.id}"><strong>${esc(pr.judul)}</strong></a><div class="muted small">${nomorSurat(pr)}</div></td>
           <td>${badgePrioritas(pr.prioritas)}</td>
           <td>${fmtWaktu(pr.tenggat)}<div class="muted small">${sisaWaktu(pr.tenggat)}</div></td>
           <td>${pen.map(p => esc(namaUser(p.penerima_id))).join(', ')}</td>
@@ -285,7 +281,7 @@ Pages.penugasanAtasan = {
         <div class="card-head"><h2>Penugasan untuk ${esc(penerima.nama)}</h2>
           <div class="row-badges">${badgeStatus(p.status)}${badgeTerlambat(p)}</div></div>
         <div class="person-head">${avatar(penerima)}
-          <div class="grow"><strong>${esc(penerima.nama)}</strong><div class="muted small">${esc(penerima.jabatan)}</div></div>
+          <div class="grow"><strong>${esc(penerima.nama)}</strong></div>
           <button class="btn btn-ghost btn-small" data-action="form-reward" data-uid="${penerima.id}">Beri reward</button>
           <button class="btn btn-warn btn-small" data-action="form-teguran" data-uid="${penerima.id}">Beri teguran</button>
         </div>
@@ -417,9 +413,9 @@ Pages.teguran = {
       .sort((a, b) => b.dibuat_pada - a.dibuat_pada);
     return `<section class="card">
         <div class="card-head"><h2>Saran sistem</h2></div>
-        <p class="muted small">Muncul jika dalam 30 hari terakhir staf terlambat ≥ 2 kali atau nilai rata-ratanya &lt; 3, dan belum ditegur dalam 14 hari terakhir.</p>
+        <p class="muted small">Kriteria: terlambat ≥ 2× atau nilai &lt; 3 dalam 30 hari.</p>
         ${saran.length ? `<ul class="list">${saran.map(s => `<li class="list-row">${avatar(s.user)}
-          <div class="grow"><strong>${esc(s.user.nama)}</strong><div class="muted small">${esc(s.alasan.join(' · '))} · teguran sebelumnya: ${s.jumlahTeguran}</div></div>
+          <div class="grow"><strong>${esc(s.user.nama)}</strong><div class="muted small">${esc(s.alasan.join(' · '))}</div></div>
           <button class="btn btn-small btn-warn" data-action="form-teguran" data-uid="${s.user.id}" data-tingkat="${s.saranTingkat}" data-alasan="${esc(s.alasan.join('; '))}">Beri ${s.saranTingkat}</button></li>`).join('')}</ul>`
           : kosong('Tidak ada saran teguran saat ini.')}
       </section>

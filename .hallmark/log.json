@@ -1,0 +1,13 @@
+[
+  {
+    "date": "2026-10-27",
+    "scope": "app",
+    "macrostructure": "Ledger (app pages) + Memo sheet (perintah pages)",
+    "theme": "Newsprint-office",
+    "theme_axes": "light / roman-serif / warm",
+    "enrichment": "none",
+    "nav": "N3 side-rail index",
+    "footer": "none (app)",
+    "brief": "Sistem Perintah & Tugas — digitalisasi perintah atasan ke bawahan (Teknik Supervisi)"
+  }
+]

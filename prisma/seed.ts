@@ -1,31 +1,42 @@
-// Data demo: dua divisi dengan ISPK/SPK di berbagai tahap alur.
-// Semua tanggal relatif terhadap saat seed dijalankan agar demo selalu "hidup".
+// Data demo SPK Eksternal Direktorat 3: order di setiap tahap RFQ → BAST, termasuk contoh
+// lewat SLA, jadwal pengajar yang bentrok, dan PP yang diajukan kurang dari 14 hari.
+// Semua tanggal relatif terhadap saat seed dijalankan.
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
-import { AksiPengesahan, JenisPerintah, Keputusan, Peran, PrismaClient, Prioritas, StatusDokumen, StatusPica, StatusTugas, TingkatTeguran } from '@prisma/client';
-import { HARI, bulanRomawi, hariKerja, mingguIso, tanggalDb, ymd } from '../lib/waktu';
-import { hitungPoin } from '../lib/logic/aturan';
+import {
+  JenisCustomer, JenisFasilitas, JenisLayanan, JenisPo, Peran, PrismaClient, StatusOrder, StatusPengajar, StatusPp, StatusQuotation,
+} from '@prisma/client';
+import { LAYANAN, type Detail } from '../lib/layanan';
+import { TAHAP } from '../lib/logic/aturan';
+import { HARI, bulanRomawi, tanggalDb, ymd } from '../lib/waktu';
 
 const db = new PrismaClient();
-const DIR = path.join(process.cwd(), 'storage', 'uploads');
 const NOW = Date.now();
+const DIR = path.join(process.cwd(), 'storage', 'uploads');
 
 /** Waktu `hari` dari sekarang pada jam tertentu (WIB). */
 function t(hari: number, jam = 9): Date {
-  const tgl = ymd(new Date(NOW + hari * HARI));
-  return new Date(`${tgl}T${String(jam).padStart(2, '0')}:00:00+07:00`);
+  return new Date(`${ymd(new Date(NOW + hari * HARI))}T${String(jam).padStart(2, '0')}:00:00+07:00`);
 }
 const tgl = (hari: number) => tanggalDb(ymd(new Date(NOW + hari * HARI)));
 
-/** PDF satu halaman sebagai contoh dokumen PO untuk SPK di data demo. */
-async function tulisContohPo() {
-  const teks = 'BT /F1 18 Tf 72 760 Td (Contoh dokumen Purchase Order) Tj 0 -28 Td /F1 11 Tf (Data demo Sistem Perintah Kerja) Tj ET';
+const urut: Record<string, number> = {};
+function nomor(awal: string, tengah: string, saat: Date) {
+  const tahun = ymd(saat).slice(0, 4);
+  const k = `${awal}/${tahun}`;
+  urut[k] = (urut[k] ?? 0) + 1;
+  return `${awal}/${String(urut[k]).padStart(3, '0')}/${tengah}${tengah ? '/' : ''}${bulanRomawi(saat)}/${tahun}`;
+}
+
+/** PDF satu halaman sebagai contoh lampiran (PO, silabus, laporan). */
+async function tulisPdf(nama: string, judul: string) {
+  const isi = `BT /F1 18 Tf 72 760 Td (${judul}) Tj 0 -28 Td /F1 11 Tf (Contoh dokumen - data demo Sistem SPK Direktorat 3) Tj ET`;
   const obj = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
-    `<< /Length ${teks.length} >>\nstream\n${teks}\nendstream`,
+    `<< /Length ${isi.length} >>\nstream\n${isi}\nendstream`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
   let pdf = '%PDF-1.4\n';
@@ -34,311 +45,216 @@ async function tulisContohPo() {
   const xref = pdf.length;
   pdf += `xref\n0 ${obj.length + 1}\n0000000000 65535 f \n${off.map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
   pdf += `trailer\n<< /Size ${obj.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  await mkdir(DIR, { recursive: true });
-  await writeFile(path.join(DIR, 'contoh__PO.pdf'), pdf);
+  await writeFile(path.join(DIR, nama), pdf);
 }
 
 async function main() {
-  // Kosongkan dari tabel anak ke induk.
   await db.$transaction([
-    db.notifikasi.deleteMany(), db.teguran.deleteMany(), db.reward.deleteMany(), db.evaluasi.deleteMany(),
-    db.laporanAkhir.deleteMany(), db.pica.deleteMany(), db.laporanMingguan.deleteMany(), db.laporanHarian.deleteMany(),
-    db.actionPlan.deleteMany(), db.pertanyaan.deleteMany(), db.penugasan.deleteMany(), db.riwayatPengesahan.deleteMany(),
-    db.langkah.deleteMany(), db.perintahKerja.deleteMany(), db.user.deleteMany(), db.divisi.deleteMany(),
+    db.notifikasi.deleteMany(), db.bast.deleteMany(), db.laporanKegiatan.deleteMany(), db.bookingFasilitas.deleteMany(),
+    db.purchaseRequest.deleteMany(), db.penugasanPengajar.deleteMany(), db.jadwalLog.deleteMany(), db.spk.deleteMany(),
+    db.purchaseOrder.deleteMany(), db.quotation.deleteMany(), db.rakItem.deleteMany(), db.silabus.deleteMany(),
+    db.riwayatOrder.deleteMany(), db.order.deleteMany(), db.fasilitas.deleteMany(), db.sla.deleteMany(),
+    db.customer.deleteMany(), db.user.deleteMany(), db.unit.deleteMany(),
+  ]);
+  await mkdir(DIR, { recursive: true });
+  await Promise.all([
+    tulisPdf('contoh__PO.pdf', 'Purchase Order'),
+    tulisPdf('contoh__Silabus.pdf', 'Silabus / RPS'),
+    tulisPdf('contoh__Laporan.pdf', 'Laporan Kegiatan'),
   ]);
 
-  await tulisContohPo();
-
-  const pms = await db.divisi.create({ data: { kode: 'PMS', nama: 'Pemasaran' } });
-  const keu = await db.divisi.create({ data: { kode: 'KEU', nama: 'Keuangan' } });
+  // ---------- Master ----------
+  const inf = await db.unit.create({ data: { kode: 'INF', nama: 'UPT Informatika' } });
+  const mkt = await db.unit.create({ data: { kode: 'MKA', nama: 'UPT Mekatronika' } });
+  await db.unit.create({ data: { kode: 'TPM', nama: 'Prodi Teknik Produksi' } });
 
   const hash = await bcrypt.hash('demo123', 10);
-  const u = async (username: string, nama: string, peran: Peran, jabatan: string, divisiId: number | null, batasTugasAktif = 3) =>
-    db.user.create({ data: { username, nama, peran, jabatan, divisiId, batasTugasAktif, passwordHash: hash } });
+  const u = (username: string, nama: string, peran: Peran, jabatan: string, unitId: number | null = null, eksternal = false) =>
+    db.user.create({ data: { username, nama, peran, jabatan, unitId, eksternal, passwordHash: hash } });
+  const admin = await u('admin', 'Admin Sistem', Peran.admin, 'Administrator Sistem');
+  const sinta = await u('marketing', 'Sinta Maharani', Peran.marketing, 'Marketing Training, Konsultasi & Sertifikasi');
+  const kadepMkt = await u('kadepmkt', 'Yudi Hartono', Peran.kadep_marketing, 'Kepala Departemen Marketing');
+  const dps = await u('dps', 'Lina Kartika', Peran.dps, 'Staf Departemen Pelatihan & Sertifikasi');
+  const kadepDps = await u('kadepdps', 'Agus Salim', Peran.kadep_dps, 'Kepala Departemen DPS');
+  const uptInf = await u('upt.inf', 'Dimas Prakoso', Peran.upt, 'Kepala UPT Informatika', inf.id);
+  const uptMkt = await u('upt.mka', 'Ratna Sari', Peran.upt, 'Kepala UPT Mekatronika', mkt.id);
+  const rudi = await u('rudi', 'Rudi Hermawan', Peran.pengajar, 'Dosen Informatika', inf.id);
+  const ayu = await u('ayu', 'Ayu Lestari', Peran.pengajar, 'Dosen Informatika', inf.id);
+  const bayu = await u('bayu', 'Bayu Saputra', Peran.pengajar, 'Dosen Mekatronika', mkt.id);
+  const hendro = await u('hendro', 'Hendro Wibowo', Peran.pengajar, 'Konsultan Lean Manufacturing', null, true);
+  void admin;
 
-  await u('admin', 'Admin Sistem', Peran.admin, 'Administrator Sistem', null);
-  const hendra = await u('hendra', 'Hendra Wijaya', Peran.manager, 'Manager Pemasaran', pms.id);
-  const lestari = await u('lestari', 'Lestari Ayu', Peran.manager, 'Manager Keuangan', keu.id);
-  const budi = await u('budi', 'Budi Santoso', Peran.spv, 'Supervisor Pemasaran', pms.id);
-  const siti = await u('siti', 'Siti Rahmawati', Peran.spv, 'Supervisor Keuangan', keu.id);
-  const andi = await u('andi', 'Andi Pratama', Peran.staff, 'Staff Digital Marketing', pms.id, 3);
-  const dewi = await u('dewi', 'Dewi Lestari', Peran.staff, 'Staff Riset Pasar', pms.id, 2);
-  const rina = await u('rina', 'Rina Marlina', Peran.staff, 'Staff Sales Support', pms.id, 3);
-  const joko = await u('joko', 'Joko Susilo', Peran.staff, 'Staff Akuntansi', keu.id, 3);
-  const maya = await u('maya', 'Maya Sari', Peran.staff, 'Staff Pajak', keu.id, 3);
-  await u('fajar', 'Fajar Nugroho', Peran.staff, 'Staff Keuangan', keu.id, 3);
+  const c = (nama: string, jenis: JenisCustomer, pic: string, telepon: string) => db.customer.create({ data: { nama, jenis, pic, telepon, email: `${pic.split(' ')[0].toLowerCase()}@contoh.co.id` } });
+  const otoparts = await c('PT Astra Otoparts Tbk', JenisCustomer.SWASTA, 'Bambang Irawan', '021-4603550');
+  const pertamina = await c('PT Pertamina (Persero)', JenisCustomer.BUMN, 'Desi Anggraini', '021-3815111');
+  const telkom = await c('PT Telkom Indonesia', JenisCustomer.BUMN, 'Fikri Ramadhan', '021-5215111');
+  const ut = await c('PT United Tractors Tbk', JenisCustomer.SWASTA, 'Wahyu Nugroho', '021-24579999');
+  const univ = await c('Universitas Teknologi Nusantara', JenisCustomer.INSTITUSI, 'Dr. Maria Ulfa', '021-7270162');
+  const sinar = await c('CV Sinar Abadi Teknik', JenisCustomer.SWASTA, 'Joko Santoso', '0812-1111-2222');
 
-  const urut: Record<string, number> = {};
+  const f = (nama: string, jenis: JenisFasilitas, kapasitas: number) => db.fasilitas.create({ data: { nama, jenis, kapasitas } });
+  const labIot = await f('Lab IoT & Embedded', JenisFasilitas.LABORATORIUM, 25);
+  const labPlc = await f('Lab PLC & Otomasi', JenisFasilitas.LABORATORIUM, 20);
+  const kelas = await f('Ruang Kelas 3.01', JenisFasilitas.RUANG_KELAS, 40);
+  await f('Aula Astratek', JenisFasilitas.AULA, 150);
+
+  // ---------- Pembangun order ----------
   type Opsi = {
-    jenis: JenisPerintah; judul: string; apa: string; mengapa: string; diMana: string; bagaimana: string;
-    prioritas: Prioritas; tenggat: Date; status: StatusDokumen; spv: typeof budi; manager: typeof hendra; divisi: typeof pms;
-    dibuat: number; langkah: string[]; po?: { noPo: string; tglPo: Date; klien: string; nilaiPo: string }; alasanTolak?: string;
+    customer: { id: number }; jenis: JenisLayanan; judul: string; deskripsi: string; detail: Detail;
+    mulai: number; lama: number; lokasi: string; peserta?: number; sampai: StatusOrder;
+    /** Hari (relatif sekarang) order dicatat; tiap tahap berikutnya berselang `jeda` hari. */
+    dibuat: number; jeda?: number; tahapMulai?: number; unit?: { id: number };
+    rak?: [string, number, string, number][]; margin?: number; pengajar?: { id: number }[];
   };
 
-  async function perintah(o: Opsi) {
-    const sah = o.status === StatusDokumen.DISAHKAN || o.status === StatusDokumen.DITURUNKAN;
-    const disahkanPada = sah ? t(o.dibuat + 1, 10) : null;
-    let nomor: string | null = null;
-    if (disahkanPada) {
-      const k = `${o.jenis}-${o.divisi.kode}`;
-      urut[k] = (urut[k] ?? 0) + 1;
-      nomor = `${o.jenis}/${String(urut[k]).padStart(3, '0')}/${o.divisi.kode}/${bulanRomawi(disahkanPada)}/${ymd(disahkanPada).slice(0, 4)}`;
-    }
-    const pr = await db.perintahKerja.create({
+  async function order(o: Opsi) {
+    const target = TAHAP.indexOf(o.sampai === StatusOrder.DITOLAK ? StatusOrder.RFQ : o.sampai === StatusOrder.BATAL ? StatusOrder.QUOTATION : o.sampai);
+    const lewat = (s: StatusOrder) => TAHAP.indexOf(s) <= target;
+    const jeda = o.jeda ?? 1;
+    // Waktu masuk tiap tahap normal.
+    const masuk = (s: StatusOrder) => t(Math.min(o.dibuat + TAHAP.indexOf(s) * jeda, 0), 10 + (TAHAP.indexOf(s) % 6));
+    const tahapMulai = o.tahapMulai != null ? t(o.tahapMulai, 10) : masuk(TAHAP[target]);
+    const dibuat = t(o.dibuat, 9);
+    const rec = await db.order.create({
       data: {
-        jenis: o.jenis, judul: o.judul, apa: o.apa, mengapa: o.mengapa, diMana: o.diMana, bagaimana: o.bagaimana,
-        prioritas: o.prioritas, tenggat: o.tenggat, status: o.status, spvId: o.spv.id, divisiId: o.divisi.id, nomor,
-        managerId: o.status === StatusDokumen.DRAF || o.status === StatusDokumen.MENUNGGU_PENGESAHAN ? null : o.manager.id,
-        diajukanPada: o.status === StatusDokumen.DRAF ? null : t(o.dibuat, 14),
-        disahkanPada, alasanTolak: o.alasanTolak ?? null,
-        ...(o.po ? { ...o.po, lampiranPo: 'contoh__PO.pdf' } : {}),
-        createdAt: t(o.dibuat, 8),
-        langkah: { create: o.langkah.map((deskripsi, i) => ({ urutan: i + 1, deskripsi })) },
+        nomorRfq: nomor('RFQ', 'D3', dibuat), customerId: o.customer.id, marketingId: sinta.id, jenis: o.jenis, judul: o.judul,
+        deskripsi: o.deskripsi, tglMulai: tgl(o.mulai), tglSelesai: tgl(o.mulai + o.lama - 1), lokasi: o.lokasi,
+        jumlahPeserta: o.peserta ?? null, detail: o.detail, status: o.sampai, tahapMulai, unitId: o.unit?.id ?? null, createdAt: dibuat,
+        alasanTutup: o.sampai === StatusOrder.DITOLAK ? 'Belum ada instruktur bersertifikat untuk skema ini.' : o.sampai === StatusOrder.BATAL ? 'Customer memilih penyedia lain karena anggaran.' : null,
       },
     });
-    const riwayat: { aksi: AksiPengesahan; olehId: number; catatan?: string; dibuatPada: Date }[] = [];
-    if (o.status !== StatusDokumen.DRAF) riwayat.push({ aksi: AksiPengesahan.DIAJUKAN, olehId: o.spv.id, dibuatPada: t(o.dibuat, 14) });
-    if (o.status === StatusDokumen.DITOLAK) riwayat.push({ aksi: AksiPengesahan.DITOLAK, olehId: o.manager.id, catatan: o.alasanTolak, dibuatPada: t(o.dibuat + 1, 10) });
-    if (sah) riwayat.push({ aksi: AksiPengesahan.DISAHKAN, olehId: o.manager.id, dibuatPada: disahkanPada! });
-    await db.riwayatPengesahan.createMany({ data: riwayat.map(r => ({ ...r, perintahId: pr.id })) });
-    return pr;
-  }
+    const riwayat: { olehId: number; dari: StatusOrder | null; ke: StatusOrder; catatan: string; dibuatPada: Date }[] = [
+      { olehId: sinta.id, dari: null, ke: StatusOrder.RFQ, catatan: 'RFQ dicatat', dibuatPada: dibuat },
+    ];
+    const pindah = (dari: StatusOrder, ke: StatusOrder, olehId: number, catatan: string) =>
+      riwayat.push({ olehId, dari, ke, catatan, dibuatPada: o.tahapMulai != null && ke === o.sampai ? tahapMulai : masuk(ke) });
 
-  type Tugas = {
-    staff: typeof andi; status: StatusTugas; diterima?: number; apSelesai?: number; harianLewati?: number[];
-    harianSampai?: number; terlambat?: boolean; laporanAkhir?: number; evaluasi?: [number, number, number, Keputusan, string?];
-  };
+    if (o.sampai === StatusOrder.DITOLAK) pindah(StatusOrder.RFQ, StatusOrder.DITOLAK, sinta.id, rec.alasanTutup!);
+    const uptUser = o.unit?.id === mkt.id ? uptMkt : uptInf;
 
-  async function turunkan(pr: Awaited<ReturnType<typeof perintah>>, turun: number, tugas: Tugas[]) {
-    await db.riwayatPengesahan.create({
-      data: { perintahId: pr.id, olehId: pr.spvId, aksi: AksiPengesahan.DITURUNKAN, catatan: tugas.map(x => x.staff.nama).join(', '), dibuatPada: t(turun, 11) },
-    });
-    const langkah = await db.langkah.findMany({ where: { perintahId: pr.id }, orderBy: { urutan: 'asc' } });
-    const hasil = [];
-    for (const x of tugas) {
-      const diterimaPada = x.diterima != null ? t(x.diterima, 13) : null;
-      const dilaporkanPada = x.laporanAkhir != null ? t(x.laporanAkhir, 16) : null;
-      const p = await db.penugasan.create({
+    if (lewat(StatusOrder.SILABUS_RAK) && o.sampai !== StatusOrder.DITOLAK) {
+      pindah(StatusOrder.RFQ, StatusOrder.SILABUS_RAK, sinta.id, 'Sanggup; request Silabus & RAK ke DPS');
+      const kirim = lewat(StatusOrder.QUOTATION);
+      const diteruskan = kirim || o.tahapMulai == null || o.tahapMulai < -1;
+      await db.silabus.create({
         data: {
-          perintahId: pr.id, staffId: x.staff.id, status: x.status, terlambat: !!x.terlambat,
-          diterimaPada, dilaporkanPada, dibuatPada: t(turun, 11),
+          orderId: rec.id, tenggat: tgl(Math.min(o.dibuat + jeda, 0) + 7),
+          diteruskanPada: diteruskan ? t(Math.min(o.dibuat + jeda, 0), 14) : null,
+          ringkasan: kirim ? `Silabus ${o.judul}: teori dasar, praktik terbimbing, studi kasus, dan evaluasi akhir.` : null,
+          berkas: kirim ? 'contoh__Silabus.pdf' : null, dikirimPada: kirim ? masuk(StatusOrder.QUOTATION) : null,
         },
       });
-      // Target AP disebar rata antara tanggal diterima dan tenggat.
-      const mulai = x.diterima ?? turun;
-      const akhir = Math.round((pr.tenggat.getTime() - NOW) / HARI);
-      const ap = [];
-      for (const [i, l] of langkah.entries()) {
-        const target = Math.round(mulai + ((akhir - mulai) * (i + 1)) / langkah.length);
-        const selesai = i < (x.apSelesai ?? 0);
-        ap.push(await db.actionPlan.create({
-          data: { penugasanId: p.id, urutan: l.urutan, kegiatan: l.deskripsi, targetTanggal: tgl(target), selesai, selesaiPada: selesai ? t(Math.min(target, -1), 15) : null },
-        }));
+      if (diteruskan) riwayat.push({ olehId: dps.id, dari: StatusOrder.SILABUS_RAK, ke: StatusOrder.SILABUS_RAK, catatan: `Diteruskan ke ${o.unit?.id === mkt.id ? mkt.nama : inf.nama}`, dibuatPada: t(Math.min(o.dibuat + jeda, 0), 14) });
+      if (kirim) {
+        await db.rakItem.createMany({ data: (o.rak ?? []).map(([uraian, volume, satuan, harga]) => ({ orderId: rec.id, uraian, volume, satuan, hargaSatuan: String(harga) })) });
+        for (const p of o.pengajar ?? []) await db.penugasanPengajar.create({ data: { orderId: rec.id, pengajarId: p.id, peran: 'Instruktur', status: StatusPengajar.USULAN } });
+        pindah(StatusOrder.SILABUS_RAK, StatusOrder.QUOTATION, uptUser.id, 'Silabus & RAK dikirim UPT');
       }
-      // Laporan harian tiap hari kerja dari diterima sampai kemarin/laporan akhir, kecuali yang dilewati.
-      if (x.diterima != null && x.harianSampai != null) {
-        const hari = hariKerja(ymd(t(x.diterima)), ymd(t(x.harianSampai)));
-        const lewati = new Set((x.harianLewati ?? []).map(i => hari[i]));
-        const selesaiAp = ap.filter(a => a.selesai);
-        let n = 0;
-        for (const [i, h] of hari.entries()) {
-          if (lewati.has(h)) continue;
-          const apIni = ap[Math.min(Math.floor((i / hari.length) * ap.length), ap.length - 1)];
-          n++;
-          await db.laporanHarian.create({
-            data: {
-              penugasanId: p.id, tanggal: tanggalDb(h), actionPlanId: apIni.id,
-              kegiatan: `Mengerjakan: ${apIni.kegiatan.toLowerCase()}.`,
-              progres: Math.round((Math.min(selesaiAp.length, Math.ceil((n / hari.length) * selesaiAp.length)) / ap.length) * 100),
-              dibuatPada: new Date(`${h}T16:30:00+07:00`),
-            },
-          });
-        }
-      }
-      if (x.laporanAkhir != null) {
-        await db.laporanAkhir.create({
-          data: { penugasanId: p.id, hasil: 'Seluruh Action Plan selesai; hasil terlampir sesuai standar pada perintah.', dikirimPada: dilaporkanPada! },
-        });
-      }
-      if (x.evaluasi) {
-        const [w, k, s, keputusan, umpan] = x.evaluasi;
-        await db.evaluasi.create({ data: { penugasanId: p.id, skorWaktu: w, skorKualitas: k, skorKesesuaian: s, keputusan, umpanBalik: umpan ?? null, dibuatPada: t(x.laporanAkhir! + 1, 10) } });
-        if (keputusan === Keputusan.setujui) {
-          const tepat = dilaporkanPada! <= pr.tenggat;
-          const poin = hitungPoin((w + k + s) / 3, tepat);
-          await db.reward.create({
-            data: {
-              penerimaId: x.staff.id, pemberiId: pr.spvId, penugasanId: p.id, jenis: 'otomatis', poin,
-              pesan: `Poin evaluasi "${pr.judul}"${tepat ? ' (termasuk bonus tepat waktu)' : ''}`, dibuatPada: t(x.laporanAkhir! + 1, 10),
-            },
-          });
-        }
-      }
-      hasil.push(p);
     }
-    return hasil;
+    const rak = (o.rak ?? []).reduce((a, [, v, , h]) => a + v * h, 0);
+    const nilai = Math.round(rak * (1 + (o.margin ?? 50) / 100));
+    if (lewat(StatusOrder.QUOTATION) && rak) {
+      const saat = new Date(masuk(StatusOrder.QUOTATION).getTime() + 3 * 3600_000);
+      const q = nomor('Q', 'D3-MKT', saat);
+      const st = o.sampai === StatusOrder.QUOTATION ? StatusQuotation.DIKIRIM : o.sampai === StatusOrder.BATAL ? StatusQuotation.DITOLAK : StatusQuotation.DISETUJUI;
+      await db.quotation.create({ data: { orderId: rec.id, nomor: q, versi: 1, nilaiRak: String(rak), marginPersen: String(o.margin ?? 50), nilaiPenawaran: String(nilai), berlakuSampai: tgl(o.dibuat + 20), status: st, dibuatPada: saat } });
+      riwayat.push({ olehId: sinta.id, dari: StatusOrder.QUOTATION, ke: StatusOrder.QUOTATION, catatan: `Quotation ${q} (v1) diterbitkan`, dibuatPada: saat });
+      if (o.sampai === StatusOrder.BATAL) pindah(StatusOrder.QUOTATION, StatusOrder.BATAL, sinta.id, rec.alasanTutup!);
+    }
+    if (lewat(StatusOrder.SPK_DRAF) && o.sampai !== StatusOrder.BATAL) {
+      const noPo = `PO/${o.customer.id}${rec.id}/2026`;
+      await db.purchaseOrder.create({ data: { orderId: rec.id, jenis: JenisPo.PO, nomor: noPo, tanggal: tgl(Math.min(o.dibuat + 3 * jeda, 0)), nilai: String(nilai), lampiran: 'contoh__PO.pdf' } });
+      pindah(StatusOrder.QUOTATION, StatusOrder.SPK_DRAF, sinta.id, `PO ${noPo} diterima`);
+    }
+    if (lewat(StatusOrder.APPROVAL_1) && o.sampai !== StatusOrder.BATAL) {
+      const a1 = lewat(StatusOrder.APPROVAL_2) ? masuk(StatusOrder.APPROVAL_2) : null;
+      const a2 = lewat(StatusOrder.PERSIAPAN) ? masuk(StatusOrder.PERSIAPAN) : null;
+      await db.spk.create({
+        data: {
+          orderId: rec.id, ruangLingkup: `${LAYANAN[o.jenis].label}: ${o.judul}. ${o.deskripsi}`, budgetRak: String(rak), nilaiKontrak: String(nilai),
+          approval1Id: a1 ? kadepMkt.id : null, approval1Pada: a1, approval2Id: a2 ? kadepDps.id : null, approval2Pada: a2,
+          nomor: a2 ? nomor('SPK', `${LAYANAN[o.jenis].kode}/D3`, a2) : null, dibuatPada: masuk(StatusOrder.SPK_DRAF),
+        },
+      });
+      pindah(StatusOrder.SPK_DRAF, StatusOrder.APPROVAL_1, sinta.id, 'SPK diajukan ke Kadep Marketing');
+      if (a1) pindah(StatusOrder.APPROVAL_1, StatusOrder.APPROVAL_2, kadepMkt.id, 'Approval 1 disetujui');
+      if (a2) pindah(StatusOrder.APPROVAL_2, StatusOrder.PERSIAPAN, kadepDps.id, 'SPK approved');
+    }
+    if (lewat(StatusOrder.PELAKSANAAN)) pindah(StatusOrder.PERSIAPAN, StatusOrder.PELAKSANAAN, dps.id, 'Program dimulai');
+    if (lewat(StatusOrder.LAPORAN)) {
+      await db.laporanKegiatan.create({ data: { orderId: rec.id, ringkasan: 'Program terlaksana sesuai SPK; seluruh sesi dan evaluasi akhir selesai.', jumlahHadir: o.peserta ?? null, lampiran: 'contoh__Laporan.pdf', dikirimPada: masuk(StatusOrder.LAPORAN) } });
+      pindah(StatusOrder.PELAKSANAAN, StatusOrder.LAPORAN, dps.id, 'Laporan kegiatan DPS dikirim');
+    }
+    if (lewat(StatusOrder.SELESAI)) {
+      const saat = masuk(StatusOrder.SELESAI);
+      const b = nomor('BAST', 'D3', saat);
+      await db.bast.create({ data: { orderId: rec.id, nomor: b, tanggal: tanggalDb(ymd(saat)), dibuatPada: saat } });
+      pindah(StatusOrder.LAPORAN, StatusOrder.SELESAI, sinta.id, `BAST ${b} diterbitkan untuk penagihan`);
+    }
+    await db.riwayatOrder.createMany({ data: riwayat.map(r => ({ ...r, orderId: rec.id })) });
+    return rec;
   }
 
-  // ---------- Pemasaran ----------
-  const spkKampanye = await perintah({
-    jenis: JenisPerintah.SPK, judul: 'Kampanye digital peluncuran produk untuk PT Sinar Jaya', prioritas: Prioritas.TINGGI,
-    apa: 'Menyiapkan dan menjalankan kampanye iklan digital (Instagram & Google Ads) untuk peluncuran produk baru klien.',
-    mengapa: 'Memenuhi PO klien: target 5.000 leads selama periode kampanye.',
-    diMana: 'Kantor Pemasaran lantai 3; koordinasi dengan klien lewat rapat daring mingguan.',
-    bagaimana: 'Materi disetujui klien sebelum tayang; laporan performa memakai template divisi.',
-    tenggat: t(12, 17), status: StatusDokumen.DITURUNKAN, spv: budi, manager: hendra, divisi: pms, dibuat: -10,
-    langkah: ['Susun brief kreatif dan jadwal tayang', 'Produksi materi visual dan copy iklan', 'Pasang dan optimasi iklan', 'Susun laporan performa kampanye'],
-    po: { noPo: 'PO/SJ/2026/0412', tglPo: tgl(-12), klien: 'PT Sinar Jaya', nilaiPo: '45000000' },
-  });
-  const [tAndi, tDewiSpk] = await turunkan(spkKampanye, -8, [
-    { staff: andi, status: StatusTugas.DIKERJAKAN, diterima: -8, apSelesai: 2, harianSampai: -1, harianLewati: [3] },
-    { staff: dewi, status: StatusTugas.DIKERJAKAN, diterima: -7, apSelesai: 1, harianSampai: -1 },
-  ]);
-  // Laporan mingguan Andi: minggu lalu tanpa kendala, minggu ini dengan PICA terbuka.
-  await db.laporanMingguan.create({
-    data: { penugasanId: tAndi.id, minggu: mingguIso(ymd(t(-7))), ringkasan: 'Brief kreatif selesai dan disetujui klien.', adaKendala: false, tanggapanSpv: 'Bagus, lanjutkan produksi materi.', dibuatPada: t(-5, 16) },
-  });
-  if (mingguIso(ymd(t(-7))) !== mingguIso()) {
-    await db.laporanMingguan.create({
-      data: {
-        penugasanId: tAndi.id, minggu: mingguIso(), ringkasan: 'Produksi materi selesai, pemasangan iklan tertunda.', adaKendala: true, dibuatPada: t(0, 8),
-        pica: {
-          create: {
-            problem: 'Akun iklan klien belum memberi akses admin ke tim kita.',
-            identifikasi: 'Proses persetujuan akses di pihak klien harus melalui bagian IT mereka.',
-            correctiveAction: 'Minta PIC klien mengeskalasi ke IT; sementara siapkan materi dan targeting di draft.',
-            pic: 'Andi Pratama', dueDate: tgl(2), status: StatusPica.OPEN,
-          },
-        },
-      },
+  /** Penugasan pengajar yang sudah ditetapkan DPS (ditambah Surat Tugas bila bersedia). */
+  async function tugaskan(orderId: number, pengajarId: number, status: StatusPengajar, suratTugas: boolean, hari: number) {
+    const saat = t(hari, 13);
+    await db.penugasanPengajar.upsert({
+      where: { orderId_pengajarId: { orderId, pengajarId } },
+      create: { orderId, pengajarId, peran: 'Instruktur', status, nomorSuratTugas: suratTugas ? nomor('ST', 'DPS', saat) : null, suratTugasPada: suratTugas ? saat : null },
+      update: { status, nomorSuratTugas: suratTugas ? nomor('ST', 'DPS', saat) : null, suratTugasPada: suratTugas ? saat : null },
     });
   }
-  await db.laporanMingguan.create({
-    data: { penugasanId: tDewiSpk.id, minggu: mingguIso(ymd(t(-7))), ringkasan: 'Riset audiens untuk targeting iklan selesai.', adaKendala: false, dibuatPada: t(-5, 16) },
-  });
 
-  const ispkLeads = await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Rekap data leads kuartal III', prioritas: Prioritas.SEDANG,
-    apa: 'Merekap seluruh leads Juli–September dari CRM dan formulir pameran ke satu lembar kerja.',
-    mengapa: 'Bahan evaluasi kanal pemasaran untuk rapat kuartal.', diMana: 'CRM perusahaan dan folder bersama divisi.',
-    bagaimana: 'Tanpa duplikat; kolom sesuai template rekap; dikirim dalam format XLSX.',
-    tenggat: t(3, 17), status: StatusDokumen.DITURUNKAN, spv: budi, manager: hendra, divisi: pms, dibuat: -9,
-    langkah: ['Ekspor data leads dari CRM', 'Gabungkan dengan data pameran', 'Bersihkan duplikat dan validasi kontak'],
-  });
-  await turunkan(ispkLeads, -7, [
-    { staff: dewi, status: StatusTugas.DILAPORKAN, diterima: -7, apSelesai: 3, harianSampai: -1, laporanAkhir: -1 },
-  ]);
+  const RAK_TRAINING: [string, number, string, number][] = [
+    ['Honor instruktur', 3, 'hari', 1_500_000], ['Modul & sertifikat peserta', 20, 'peserta', 150_000],
+    ['Konsumsi', 60, 'porsi', 50_000], ['Bahan praktik', 1, 'paket', 1_000_000],
+  ];
 
-  const ispkKompetitor = await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Laporan analisis kompetitor bulan lalu', prioritas: Prioritas.SEDANG,
-    apa: 'Menyusun analisis harga dan promo 3 kompetitor utama.', mengapa: 'Dasar penentuan promo bulan berjalan.',
-    diMana: 'Riset daring dan kunjungan ke 2 dealer kompetitor.', bagaimana: 'Maksimal 5 halaman, tabel perbandingan wajib ada.',
-    tenggat: t(-14, 17), status: StatusDokumen.DITURUNKAN, spv: budi, manager: hendra, divisi: pms, dibuat: -26,
-    langkah: ['Kumpulkan data harga dan promo', 'Kunjungi dealer kompetitor', 'Susun laporan analisis'],
-  });
-  await turunkan(ispkKompetitor, -24, [
-    { staff: andi, status: StatusTugas.DISETUJUI, diterima: -24, apSelesai: 3, harianSampai: -15, laporanAkhir: -15, evaluasi: [5, 4, 5, Keputusan.setujui] },
-    { staff: rina, status: StatusTugas.DISETUJUI, diterima: -23, apSelesai: 3, harianSampai: -12, harianLewati: [2, 5], laporanAkhir: -12, terlambat: true, evaluasi: [2, 3, 3, Keputusan.setujui, 'Terlambat 2 hari; tabel perbandingan kurang lengkap.'] },
-  ]);
-
-  const ispkKatalog = await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Pembaruan katalog produk untuk tim sales', prioritas: Prioritas.TINGGI,
-    apa: 'Memperbarui katalog PDF dengan harga dan spesifikasi terbaru.', mengapa: 'Katalog lama memuat harga yang sudah tidak berlaku.',
-    diMana: 'Folder bersama divisi; koordinasi dengan bagian produk.', bagaimana: 'Sesuai panduan merek; diperiksa ulang oleh SPV sebelum dibagikan.',
-    tenggat: t(-2, 17), status: StatusDokumen.DITURUNKAN, spv: budi, manager: hendra, divisi: pms, dibuat: -12,
-    langkah: ['Kumpulkan harga dan spesifikasi terbaru', 'Perbarui tata letak katalog', 'Kirim untuk diperiksa'],
-  });
-  await turunkan(ispkKatalog, -10, [
-    { staff: rina, status: StatusTugas.DIKERJAKAN, diterima: -10, apSelesai: 1, harianSampai: -1, harianLewati: [1, 3, 4, 6], terlambat: true },
-  ]);
-
-  const ispkRiset = await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Riset harga pasar untuk produk baru', prioritas: Prioritas.SEDANG,
-    apa: 'Mengumpulkan harga 10 produk sejenis di marketplace dan toko resmi.', mengapa: 'Masukan penetapan harga peluncuran.',
-    diMana: 'Marketplace daring dan 3 toko resmi di Jakarta.', bagaimana: 'Tabel harga dengan sumber dan tanggal pengambilan.',
-    tenggat: t(9, 17), status: StatusDokumen.DITURUNKAN, spv: budi, manager: hendra, divisi: pms, dibuat: -3,
-    langkah: ['Tentukan daftar produk pembanding', 'Kumpulkan harga dari setiap sumber', 'Susun tabel dan ringkasan'],
-  });
-  const [, tAndiRiset] = await turunkan(ispkRiset, -1, [
-    { staff: dewi, status: StatusTugas.MENUNGGU_RESPON },
-    { staff: andi, status: StatusTugas.MENUNGGU_JAWABAN },
-  ]);
-  await db.pertanyaan.create({ data: { penugasanId: tAndiRiset.id, isi: 'Apakah harga diskon flash sale ikut dicatat atau hanya harga normal?', ditanyaPada: t(0, 8) } });
-
-  await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Penyusunan materi pelatihan sales baru', prioritas: Prioritas.SEDANG,
-    apa: 'Menyusun modul pelatihan produk untuk 8 sales baru.', mengapa: 'Mempercepat masa adaptasi sales baru.',
-    diMana: 'Ruang pelatihan lantai 2.', bagaimana: 'Modul 20–30 slide disertai kuis pemahaman.',
-    tenggat: t(14, 17), status: StatusDokumen.MENUNGGU_PENGESAHAN, spv: budi, manager: hendra, divisi: pms, dibuat: -1,
-    langkah: ['Kumpulkan materi produk', 'Susun slide modul', 'Buat kuis pemahaman'],
-  });
-  await perintah({
-    jenis: JenisPerintah.SPK, judul: 'Pameran produk di dealer CV Maju Motor', prioritas: Prioritas.TINGGI,
-    apa: 'Menyiapkan booth dan materi promosi pameran 3 hari di dealer klien.', mengapa: 'Memenuhi PO klien untuk aktivasi penjualan akhir tahun.',
-    diMana: 'Dealer CV Maju Motor, Bekasi.', bagaimana: 'Booth sesuai denah klien; laporan pengunjung harian.',
-    tenggat: t(20, 17), status: StatusDokumen.DITOLAK, spv: budi, manager: hendra, divisi: pms, dibuat: -4,
-    langkah: ['Survei lokasi', 'Produksi booth dan materi', 'Pelaksanaan pameran'],
-    po: { noPo: 'PO/MM/2026/118', tglPo: tgl(-6), klien: 'CV Maju Motor', nilaiPo: '28500000' },
-    alasanTolak: 'Nilai PO pada form berbeda dengan dokumen PO terlampir (Rp 25.800.000). Mohon disesuaikan dan lampirkan PO versi final.',
-  });
-  await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Survei kepuasan pelanggan semester II', prioritas: Prioritas.RENDAH,
-    apa: 'Menyebarkan dan merekap survei kepuasan ke 200 pelanggan.', mengapa: 'Indikator mutu layanan tahunan.',
-    diMana: 'Survei daring melalui email pelanggan.', bagaimana: 'Minimal 60 responden; rekap dalam grafik.',
-    tenggat: t(25, 17), status: StatusDokumen.DISAHKAN, spv: budi, manager: hendra, divisi: pms, dibuat: -2,
-    langkah: ['Susun kuesioner', 'Sebarkan survei', 'Rekap dan analisis hasil'],
-  });
-  await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Rencana konten media sosial bulan depan', prioritas: Prioritas.RENDAH,
-    apa: 'Kalender konten 20 unggahan untuk Instagram dan LinkedIn.', mengapa: 'Menjaga konsistensi unggahan.',
-    diMana: 'Kantor Pemasaran.', bagaimana: 'Format kalender divisi; setiap unggahan memiliki tujuan dan CTA.',
-    tenggat: t(18, 17), status: StatusDokumen.DRAF, spv: budi, manager: hendra, divisi: pms, dibuat: 0,
-    langkah: ['Tentukan tema mingguan', 'Susun kalender konten'],
-  });
-
-  // ---------- Keuangan ----------
-  const spkAudit = await perintah({
-    jenis: JenisPerintah.SPK, judul: 'Verifikasi tagihan proyek PT Global Teknik', prioritas: Prioritas.TINGGI,
-    apa: 'Memverifikasi 42 tagihan termin proyek terhadap PO dan berita acara.', mengapa: 'Syarat pencairan termin ketiga dari klien.',
-    diMana: 'Ruang arsip Keuangan dan sistem ERP.', bagaimana: 'Setiap tagihan dicocokkan dengan PO; selisih dicatat di kertas kerja.',
-    tenggat: t(6, 17), status: StatusDokumen.DITURUNKAN, spv: siti, manager: lestari, divisi: keu, dibuat: -6,
-    langkah: ['Kumpulkan tagihan dan berita acara', 'Cocokkan dengan PO', 'Susun kertas kerja selisih'],
-    po: { noPo: 'PO/GT/2026/077', tglPo: tgl(-30), klien: 'PT Global Teknik', nilaiPo: '120000000' },
-  });
-  await turunkan(spkAudit, -4, [{ staff: joko, status: StatusTugas.DIKERJAKAN, diterima: -4, apSelesai: 1, harianSampai: -1 }]);
-
-  const ispkPajak = await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Rekap PPN masukan bulan lalu', prioritas: Prioritas.SEDANG,
-    apa: 'Merekap faktur PPN masukan untuk pelaporan SPT Masa.', mengapa: 'Batas lapor SPT Masa PPN.',
-    diMana: 'Sistem e-Faktur dan arsip faktur.', bagaimana: 'Rekap sesuai format e-Faktur, tanpa selisih.',
-    tenggat: t(-6, 17), status: StatusDokumen.DITURUNKAN, spv: siti, manager: lestari, divisi: keu, dibuat: -16,
-    langkah: ['Unduh daftar faktur', 'Cocokkan dengan arsip', 'Susun rekap'],
-  });
-  await turunkan(ispkPajak, -14, [
-    { staff: maya, status: StatusTugas.DISETUJUI, diterima: -14, apSelesai: 3, harianSampai: -7, laporanAkhir: -7, evaluasi: [5, 5, 4, Keputusan.setujui] },
-  ]);
-  await perintah({
-    jenis: JenisPerintah.ISPK, judul: 'Rekonsiliasi kas kecil bulan berjalan', prioritas: Prioritas.SEDANG,
-    apa: 'Rekonsiliasi kas kecil seluruh divisi.', mengapa: 'Tutup buku bulanan.', diMana: 'Ruang Keuangan.',
-    bagaimana: 'Selisih di atas Rp 50.000 dijelaskan.', tenggat: t(8, 17), status: StatusDokumen.MENUNGGU_PENGESAHAN,
-    spv: siti, manager: lestari, divisi: keu, dibuat: 0, langkah: ['Kumpulkan bukti kas', 'Hitung dan cocokkan saldo'],
-  });
-
-  // Reward manual dan satu teguran lama sebagai contoh riwayat.
-  await db.reward.create({ data: { penerimaId: andi.id, pemberiId: budi.id, jenis: 'pujian', poin: 10, pesan: 'Inisiatif bagus menyiapkan materi cadangan saat akses iklan tertunda.', dibuatPada: t(-2, 15) } });
-  await db.reward.create({ data: { penerimaId: maya.id, pemberiId: siti.id, jenis: 'sertifikat', poin: 0, pesan: 'Karyawan Teladan bulan lalu.', dibuatPada: t(-5, 15) } });
-  await db.teguran.create({
-    data: { penerimaId: rina.id, pemberiId: budi.id, tingkat: TingkatTeguran.Lisan, alasan: 'Terlambat menyerahkan laporan kunjungan.', catatanPembinaan: 'Gunakan AP harian untuk memecah pekerjaan.', dibacaPada: t(-39, 10), dibuatPada: t(-40, 10) },
-  });
+  // 1. RFQ baru masuk
+  await order({ customer: telkom, jenis: JenisLayanan.TRAINING, judul: 'Training Python untuk Data Analyst', deskripsi: 'Pelatihan Python & pandas untuk 20 analis data.', detail: { paxRate: '3500000', tempat: 'Astratek' }, mulai: 40, lama: 3, lokasi: 'Kampus Astratek', peserta: 20, sampai: StatusOrder.RFQ, dibuat: -1 });
+  // 2. RFQ lewat SLA analisis
+  await order({ customer: otoparts, jenis: JenisLayanan.KONSULTASI, judul: 'Konsultasi Lean Manufacturing Line Assembly', deskripsi: 'Pendampingan penurunan waste di line assembly.', detail: { lingkup: 'Pemetaan VSM dan rekomendasi perbaikan line assembly A.', metode: 'Gemba / Field Visit', milestone: 'Minggu 2: VSM current state; minggu 4: laporan solusi.', jadwalMonitoring: 'Setiap Jumat' }, mulai: 30, lama: 20, lokasi: 'Plant Astra Otoparts, Sunter', sampai: StatusOrder.RFQ, dibuat: -4 });
+  // 3. Silabus & RAK menunggu DPS
+  await order({ customer: pertamina, jenis: JenisLayanan.SERTIFIKASI, judul: 'Sertifikasi BNSP Junior Network Administrator', deskripsi: 'Uji kompetensi 15 teknisi jaringan.', detail: { skema: 'Junior Network Administrator', lembaga: 'LSP Politeknik Astra', nilaiPerPeserta: '2750000', syaratLulus: 'Lulus uji tulis dan praktik konfigurasi jaringan.' }, mulai: 35, lama: 2, lokasi: 'Kampus Astratek', peserta: 15, sampai: StatusOrder.SILABUS_RAK, dibuat: -2, tahapMulai: -1, unit: inf });
+  // 4. Silabus & RAK di UPT, lewat SLA (masalah lead time > 1 minggu)
+  await order({ customer: otoparts, jenis: JenisLayanan.TRAINING, judul: 'Training IoT untuk Maintenance Prediktif', deskripsi: 'Pelatihan sensor dan dashboard IoT untuk tim maintenance.', detail: { paxRate: '4200000', tempat: 'In-house (lokasi customer)' }, mulai: 28, lama: 3, lokasi: 'Plant Astra Otoparts, Sunter', peserta: 18, sampai: StatusOrder.SILABUS_RAK, dibuat: -10, tahapMulai: -9, unit: inf });
+  // 5. Quotation terkirim (contoh RAK Rp10 jt → penawaran Rp30 jt)
+  await order({ customer: ut, jenis: JenisLayanan.KOMBINASI, judul: 'Training + Sertifikasi Programmable Logic Controller', deskripsi: 'Paket pelatihan PLC dan uji sertifikasi untuk 12 teknisi.', detail: { modulTraining: 'PLC dasar, ladder diagram, troubleshooting.', paxRate: '2500000', skema: 'Teknisi Otomasi Industri', lembaga: 'LSP Politeknik Astra', nilaiPerPeserta: '1500000' }, mulai: 25, lama: 4, lokasi: 'Kampus Astratek', peserta: 12, sampai: StatusOrder.QUOTATION, dibuat: -6, unit: mkt, rak: [['Honor instruktur', 4, 'hari', 1_250_000], ['Biaya uji sertifikasi', 12, 'peserta', 250_000], ['Bahan praktik PLC', 1, 'paket', 2_000_000]], margin: 200, pengajar: [bayu] });
+  // 6. Menunggu approval 1
+  await order({ customer: univ, jenis: JenisLayanan.TRAINING, judul: 'Workshop Industri 4.0 untuk Dosen', deskripsi: 'Workshop 2 hari bagi 30 dosen teknik.', detail: { paxRate: '1800000', tempat: 'Astratek' }, mulai: 20, lama: 2, lokasi: 'Kampus Astratek', peserta: 30, sampai: StatusOrder.APPROVAL_1, dibuat: -8, unit: inf, rak: RAK_TRAINING, margin: 60, pengajar: [ayu] });
+  // 7. Menunggu approval 2
+  await order({ customer: sinar, jenis: JenisLayanan.SEWA_RUANG, judul: 'Sewa Lab PLC untuk Pelatihan Internal', deskripsi: 'Penyewaan lab PLC 2 hari untuk pelatihan internal customer.', detail: { ruangan: 'Lab PLC & Otomasi', durasi: '2 hari', fasilitasPendukung: '10 trainer kit PLC, proyektor' }, mulai: 18, lama: 2, lokasi: 'Lab PLC & Otomasi', peserta: 15, sampai: StatusOrder.APPROVAL_2, dibuat: -9, unit: mkt, rak: [['Sewa lab', 2, 'hari', 2_000_000], ['Teknisi pendamping', 2, 'hari', 500_000]], margin: 40 });
+  // 8. Persiapan: pengajar, PP mepet, booking lab
+  const iot = await order({ customer: otoparts, jenis: JenisLayanan.TRAINING, judul: 'Training Embedded System untuk Teknisi Produksi', deskripsi: 'Pelatihan mikrokontroler dan sensor untuk 20 teknisi.', detail: { paxRate: '3800000', tempat: 'Astratek' }, mulai: 10, lama: 3, lokasi: 'Kampus Astratek', peserta: 20, sampai: StatusOrder.PERSIAPAN, dibuat: -20, jeda: 2, unit: inf, rak: RAK_TRAINING, margin: 80, pengajar: [rudi, ayu] });
+  await tugaskan(iot.id, rudi.id, StatusPengajar.BERSEDIA, true, -2);
+  await tugaskan(iot.id, ayu.id, StatusPengajar.MENUNGGU, false, -1);
+  await db.purchaseRequest.create({ data: { orderId: iot.id, item: 'Sensor suhu DHT22', jumlah: 20, satuan: 'pcs', estimasiHarga: '45000', status: StatusPp.DIPROSES, dibuatPada: t(-1, 11) } });
+  await db.purchaseRequest.create({ data: { orderId: iot.id, item: 'Modul relay 4 channel', jumlah: 20, satuan: 'pcs', estimasiHarga: '65000', status: StatusPp.DIAJUKAN, dibuatPada: t(0, 8) } });
+  await db.bookingFasilitas.create({ data: { orderId: iot.id, fasilitasId: labIot.id, mulai: tgl(10), selesai: tgl(12) } });
+  // 9. Persiapan dengan tanggal tumpang tindih: Rudi diusulkan UPT tetapi bentrok dengan order 8
+  await order({ customer: telkom, jenis: JenisLayanan.TRAINING, judul: 'Training Cyber Security Awareness', deskripsi: 'Pelatihan keamanan siber dasar untuk 35 karyawan.', detail: { paxRate: '1500000', tempat: 'In-house (lokasi customer)' }, mulai: 11, lama: 2, lokasi: 'Telkom Landmark Tower, Jakarta', peserta: 35, sampai: StatusOrder.PERSIAPAN, dibuat: -16, jeda: 2, tahapMulai: -1, unit: inf, rak: RAK_TRAINING, margin: 50, pengajar: [rudi] });
+  // 10. Sedang dilaksanakan
+  const srt = await order({ customer: pertamina, jenis: JenisLayanan.SERTIFIKASI, judul: 'Sertifikasi Operator K3 Listrik', deskripsi: 'Uji kompetensi K3 listrik untuk 25 operator.', detail: { skema: 'Operator K3 Listrik', lembaga: 'Asosiasi K3 Indonesia', nilaiPerPeserta: '3200000', syaratLulus: 'Nilai uji tulis ≥ 70 dan lulus praktik.' }, mulai: -2, lama: 4, lokasi: 'Kampus Astratek', peserta: 25, sampai: StatusOrder.PELAKSANAAN, dibuat: -30, jeda: 3, unit: mkt, rak: [['Biaya asesor', 2, 'orang', 3_000_000], ['Biaya uji', 25, 'peserta', 1_200_000]], margin: 50, pengajar: [bayu] });
+  await tugaskan(srt.id, bayu.id, StatusPengajar.BERSEDIA, true, -8);
+  await db.bookingFasilitas.create({ data: { orderId: srt.id, fasilitasId: kelas.id, mulai: tgl(-2), selesai: tgl(1) } });
+  // 11. Laporan masuk, menunggu BAST
+  const kns = await order({ customer: ut, jenis: JenisLayanan.KONSULTASI, judul: 'Konsultasi Sistem Maintenance Berbasis TPM', deskripsi: 'Penyusunan sistem TPM untuk workshop alat berat.', detail: { lingkup: 'Audit TPM dan rancangan pilar autonomous maintenance.', metode: 'FGD', milestone: 'Laporan audit; rancangan sistem; sosialisasi.', jadwalMonitoring: 'Dua mingguan' }, mulai: -20, lama: 15, lokasi: 'Workshop United Tractors, Cakung', sampai: StatusOrder.LAPORAN, dibuat: -45, jeda: 4, tahapMulai: -2, unit: mkt, rak: [['Honor konsultan', 6, 'hari', 3_500_000], ['Transport & akomodasi', 1, 'paket', 4_000_000]], margin: 70, pengajar: [hendro] });
+  await tugaskan(kns.id, hendro.id, StatusPengajar.BERSEDIA, true, -25);
+  // 12. Selesai dengan BAST
+  const kmb = await order({ customer: univ, jenis: JenisLayanan.KOMBINASI, judul: 'Training + Sertifikasi Desain CAD', deskripsi: 'Paket pelatihan dan sertifikasi CAD untuk 20 mahasiswa.', detail: { modulTraining: 'Gambar teknik, CAD 2D/3D.', paxRate: '2000000', skema: 'Drafter CAD', lembaga: 'LSP Politeknik Astra', nilaiPerPeserta: '1000000' }, mulai: -40, lama: 5, lokasi: 'Kampus Astratek', peserta: 20, sampai: StatusOrder.SELESAI, dibuat: -70, jeda: 6, unit: inf, rak: RAK_TRAINING, margin: 90, pengajar: [ayu] });
+  await tugaskan(kmb.id, ayu.id, StatusPengajar.BERSEDIA, true, -45);
+  await db.bookingFasilitas.create({ data: { orderId: kmb.id, fasilitasId: labPlc.id, mulai: tgl(-40), selesai: tgl(-36) } });
+  // 13–14. Order tertutup
+  await order({ customer: sinar, jenis: JenisLayanan.TRAINING, judul: 'Training Pneumatik Dasar', deskripsi: 'Pelatihan pneumatik untuk 10 teknisi.', detail: { paxRate: '2200000', tempat: 'Astratek' }, mulai: 15, lama: 2, lokasi: 'Kampus Astratek', peserta: 10, sampai: StatusOrder.BATAL, dibuat: -14, jeda: 2, unit: mkt, rak: RAK_TRAINING, margin: 50 });
+  await order({ customer: telkom, jenis: JenisLayanan.SERTIFIKASI, judul: 'Sertifikasi Cloud Architect', deskripsi: 'Sertifikasi internasional cloud untuk 8 engineer.', detail: { skema: 'Cloud Architect', lembaga: 'Asosiasi Cloud Indonesia', nilaiPerPeserta: '6000000', syaratLulus: 'Lulus ujian daring.' }, mulai: 30, lama: 1, lokasi: 'Daring', peserta: 8, sampai: StatusOrder.DITOLAK, dibuat: -5 });
 
   // Notifikasi awal agar lonceng tidak kosong.
   await db.notifikasi.createMany({
     data: [
-      { userId: hendra.id, pesan: `${budi.nama} mengajukan ISPK "Penyusunan materi pelatihan sales baru" untuk disahkan`, tautan: '/manager', dibuatPada: t(-1, 14) },
-      { userId: budi.id, pesan: `${andi.nama} bertanya tentang "Riset harga pasar untuk produk baru"`, tautan: `/spv/penugasan/${tAndiRiset.id}`, dibuatPada: t(0, 8) },
-      { userId: budi.id, pesan: `${andi.nama} melaporkan kendala (PICA) di "${spkKampanye.judul}"`, tautan: `/spv/penugasan/${tAndi.id}`, dibuatPada: t(0, 8) },
-      { userId: dewi.id, pesan: `Perintah kerja baru: "Riset harga pasar untuk produk baru"`, tautan: '/staff', dibuatPada: t(-1, 11) },
-      { userId: lestari.id, pesan: `${siti.nama} mengajukan ISPK "Rekonsiliasi kas kecil bulan berjalan" untuk disahkan`, tautan: '/manager', dibuatPada: t(0, 14) },
+      { userId: kadepMkt.id, pesan: 'Approval 1 SPK: Workshop Industri 4.0 untuk Dosen', tautan: '/approval', dibuatPada: t(0, 8) },
+      { userId: kadepDps.id, pesan: 'Approval 2 SPK: Sewa Lab PLC untuk Pelatihan Internal', tautan: '/approval', dibuatPada: t(0, 8) },
+      { userId: ayu.id, pesan: 'Konfirmasi ketersediaan mengajar: Training Embedded System untuk Teknisi Produksi', tautan: '/pengajar', dibuatPada: t(-1, 13) },
+      { userId: uptInf.id, pesan: 'Request Silabus & RAK: Training IoT untuk Maintenance Prediktif', tautan: '/upt', dibuatPada: t(-9, 14) },
     ],
   });
 

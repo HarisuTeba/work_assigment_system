@@ -1,36 +1,31 @@
-import { StatusTugas, type Prisma, type PrismaClient } from '@prisma/client';
-import { HARI } from '../waktu';
+import { StatusOrder, type Prisma, type PrismaClient } from '@prisma/client';
 
 export type Db = Prisma.TransactionClient | PrismaClient;
 
-/** Tugas yang dihitung terhadap batas KPI staff. */
-export const STATUS_AKTIF: StatusTugas[] = [StatusTugas.DITERIMA, StatusTugas.DIKERJAKAN, StatusTugas.DILAPORKAN, StatusTugas.REVISI];
-/** Tugas yang sedang dikerjakan (boleh mengisi AP dan laporan). */
-export const STATUS_KERJA: StatusTugas[] = [StatusTugas.DITERIMA, StatusTugas.DIKERJAKAN, StatusTugas.REVISI];
-/** Belum direspons staff. */
-export const STATUS_RESPON: StatusTugas[] = [StatusTugas.MENUNGGU_RESPON, StatusTugas.MENUNGGU_JAWABAN];
-/** Tidak lagi bisa terlambat. */
-export const STATUS_TUTUP: StatusTugas[] = [StatusTugas.DILAPORKAN, StatusTugas.DISETUJUI, StatusTugas.DITOLAK_STAFF];
+/** Urutan tahap normal sebuah order. */
+export const TAHAP: StatusOrder[] = [
+  StatusOrder.RFQ, StatusOrder.SILABUS_RAK, StatusOrder.QUOTATION, StatusOrder.SPK_DRAF,
+  StatusOrder.APPROVAL_1, StatusOrder.APPROVAL_2, StatusOrder.PERSIAPAN, StatusOrder.PELAKSANAAN,
+  StatusOrder.LAPORAN, StatusOrder.SELESAI,
+];
+export const STATUS_TUTUP: StatusOrder[] = [StatusOrder.SELESAI, StatusOrder.DITOLAK, StatusOrder.BATAL];
+/** Jadwal masih boleh diubah sebelum laporan kegiatan dibuat. */
+export const BOLEH_UBAH_JADWAL: StatusOrder[] = TAHAP.slice(0, TAHAP.indexOf(StatusOrder.PELAKSANAAN) + 1);
 
+/** Default SLA (hari) bila tabel sla belum diisi. PERSIAPAN/PELAKSANAAN mengikuti tanggal pelaksanaan. */
+export const SLA_DEFAULT: Partial<Record<StatusOrder, number>> = {
+  RFQ: 2, SILABUS_RAK: 7, QUOTATION: 7, SPK_DRAF: 2, APPROVAL_1: 2, APPROVAL_2: 2, LAPORAN: 5,
+};
+/** Lead time ideal PP sebelum pelaksanaan. */
+export const LEAD_TIME_PP = 14;
 export const BATAS_LAMPIRAN = 2 * 1024 * 1024;
-export const JENDELA_EVALUASI = 30 * HARI; // rentang untuk saran teguran
-export const JEDA_TEGURAN = 14 * HARI;     // saran disembunyikan bila baru saja ditegur
-export const BATAS_BOLONG = 3;             // hari kerja tanpa laporan harian dalam 30 hari
-export const TINGKAT_TEGURAN = ['Lisan', 'SP1', 'SP2'] as const;
-
-export function hitungPoin(rataSkor: number, tepatWaktu: boolean): number {
-  return Math.round(rataSkor * 10) + (tepatWaktu ? 10 : 0);
-}
-
-export function skorRata(e: { skorWaktu: number; skorKualitas: number; skorKesesuaian: number }): number {
-  return (e.skorWaktu + e.skorKualitas + e.skorKesesuaian) / 3;
-}
 
 export async function notify(tx: Db, userId: number, pesan: string, tautan: string) {
   await tx.notifikasi.create({ data: { userId, pesan: pesan.slice(0, 255), tautan } });
 }
 
 export async function notifyBanyak(tx: Db, userIds: number[], pesan: string, tautan: string) {
-  if (!userIds.length) return;
-  await tx.notifikasi.createMany({ data: userIds.map(userId => ({ userId, pesan: pesan.slice(0, 255), tautan })) });
+  const unik = [...new Set(userIds)];
+  if (!unik.length) return;
+  await tx.notifikasi.createMany({ data: unik.map(userId => ({ userId, pesan: pesan.slice(0, 255), tautan })) });
 }

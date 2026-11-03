@@ -5,26 +5,28 @@ import { login } from '@/app/actions/akun';
 export const metadata: Metadata = { title: 'Masuk' };
 
 const DEMO = [
-  ['admin', 'Admin', 'kelola divisi, akun, batas KPI'],
-  ['hendra', 'Manager', 'sahkan / tolak ISPK & SPK'],
-  ['budi', 'Supervisor', 'terbitkan dan turunkan perintah'],
-  ['andi', 'Staff', 'AP harian, PICA, laporan akhir'],
-  ['dewi', 'Staff', 'KPI penuh → alert saat menerima'],
+  ['marketing', 'Marketing', 'RFQ, quotation, PO, SPK, BAST'],
+  ['kadepmkt', 'Kadep Marketing', 'approval 1 SPK'],
+  ['dps', 'DPS', 'silabus ke UPT, pengajar, PP, fasilitas'],
+  ['kadepdps', 'Kadep DPS', 'approval 2 SPK'],
+  ['upt.inf', 'UPT Informatika', 'silabus, RAK, usulan pengajar'],
+  ['rudi', 'Pengajar', 'konfirmasi penugasan'],
+  ['admin', 'Admin', 'pengguna, master, SLA'],
 ];
 
 export default function LoginPage() {
   return (
     <div className="login-wrap">
       <section className="login-intro">
-        <span className="wordmark" style={{ borderBottom: 0, padding: 0 }}>Perintah Kerja</span>
-        <h1>Sistem Pemberian Perintah Kerja</h1>
-        <p>Perintah kerja diterbitkan lewat ISPK atau SPK, disahkan Manager, lalu diturunkan ke staff dan dipantau sampai laporan akhir.</p>
+        <span className="wordmark" style={{ borderBottom: 0, padding: 0 }}>SPK · Direktorat 3</span>
+        <h1>Sistem SPK Eksternal</h1>
+        <p>Direktorat 3 Industrial Service · Politeknik Astra. Order training, konsultasi, dan sertifikasi dipantau dari RFQ sampai BAST.</p>
         <ol>
-          <li><b>1</b>SPV menerbitkan ISPK (proyek internal) atau SPK (proyek PO)</li>
-          <li><b>2</b>Manager mengesahkan atau menolak dengan alasan</li>
-          <li><b>3</b>Staff menerima atau menolak sesuai batas KPI</li>
-          <li><b>4</b>Laporan harian lewat AP, mingguan dengan PICA</li>
-          <li><b>5</b>Laporan akhir, evaluasi, dan poin</li>
+          <li><b>1</b>RFQ customer dan analisis kesanggupan</li>
+          <li><b>2</b>Silabus & RAK dari DPS dan UPT/Prodi</li>
+          <li><b>3</b>Quotation, lalu PO customer</li>
+          <li><b>4</b>SPK disetujui Kadep Marketing dan Kadep DPS</li>
+          <li><b>5</b>Persiapan, pelaksanaan, laporan, BAST</li>
         </ol>
       </section>
       <section className="login-form">

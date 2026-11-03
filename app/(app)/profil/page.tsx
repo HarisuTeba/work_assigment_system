@@ -1,15 +1,12 @@
 import { Form, Submit } from '@/components/Form';
-import { KpiMeter } from '@/components/badges';
 import { gantiPassword } from '@/app/actions/akun';
 import { LABEL_PERAN } from '@/lib/format';
-import { infoKpi } from '@/lib/logic/penugasan';
 import { wajibLogin } from '@/lib/session';
 
 export const metadata = { title: 'Profil' };
 
 export default async function ProfilPage() {
   const u = await wajibLogin();
-  const kpi = u.peran === 'staff' ? await infoKpi(u.id) : null;
   return (
     <>
       <div className="page-head"><h1>Profil</h1></div>
@@ -21,8 +18,7 @@ export default async function ProfilPage() {
             <dt>Username</dt><dd>{u.username}</dd>
             <dt>Peran</dt><dd>{LABEL_PERAN[u.peran]}</dd>
             <dt>Jabatan</dt><dd>{u.jabatan}</dd>
-            <dt>Divisi</dt><dd>{u.divisi?.nama ?? '—'}</dd>
-            {kpi && <><dt>KPI tugas aktif</dt><dd><KpiMeter aktif={kpi.aktif} batas={kpi.batas} /></dd></>}
+            <dt>UPT / Prodi</dt><dd>{u.unit?.nama ?? '—'}</dd>
           </dl>
         </section>
         <section className="card">

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Peran } from '@prisma/client';
 import { db } from './db';
+import { beranda } from './peran';
 import { COOKIE, UMUR_SESI, bacaToken, buatToken } from './session-token';
 
 export async function mulaiSesi(uid: number, peran: Peran) {
@@ -20,7 +21,7 @@ export async function akhiriSesi() {
 export const penggunaSaatIni = cache(async () => {
   const t = await bacaToken((await cookies()).get(COOKIE)?.value);
   if (!t) return null;
-  const u = await db.user.findUnique({ where: { id: t.uid }, include: { divisi: true } });
+  const u = await db.user.findUnique({ where: { id: t.uid }, include: { unit: true } });
   return u && u.aktif ? u : null;
 });
 
@@ -30,6 +31,6 @@ export type Pengguna = NonNullable<Awaited<ReturnType<typeof penggunaSaatIni>>>;
 export async function wajibLogin(...peran: Peran[]): Promise<Pengguna> {
   const u = await penggunaSaatIni();
   if (!u) redirect('/login');
-  if (peran.length && !peran.includes(u.peran)) redirect(`/${u.peran}`);
+  if (peran.length && !peran.includes(u.peran)) redirect(beranda(u.peran));
   return u;
 }

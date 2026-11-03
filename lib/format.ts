@@ -1,33 +1,38 @@
-import type { JenisPerintah, Peran, Prioritas, StatusDokumen, StatusTugas } from '@prisma/client';
+import type { JenisCustomer, Peran, StatusOrder, StatusPengajar, StatusPp } from '@prisma/client';
 import { ZONA } from './waktu';
 
-export const LABEL_PERAN: Record<Peran, string> = { admin: 'Admin', manager: 'Manager', spv: 'Supervisor', staff: 'Staff' };
-
-export const LABEL_JENIS: Record<JenisPerintah, string> = {
-  ISPK: 'ISPK · Proyek Internal',
-  SPK: 'SPK · Proyek PO',
+export const LABEL_PERAN: Record<Peran, string> = {
+  admin: 'Admin',
+  marketing: 'Marketing',
+  kadep_marketing: 'Kadep Marketing',
+  dps: 'DPS',
+  kadep_dps: 'Kadep DPS',
+  upt: 'UPT / Prodi',
+  pengajar: 'Pengajar',
 };
 
-export const LABEL_DOKUMEN: Record<StatusDokumen, string> = {
-  DRAF: 'Draf',
-  MENUNGGU_PENGESAHAN: 'Menunggu Pengesahan',
-  DITOLAK: 'Ditolak Manager',
-  DISAHKAN: 'Disahkan',
-  DITURUNKAN: 'Diturunkan',
+export const LABEL_STATUS: Record<StatusOrder, string> = {
+  RFQ: 'RFQ masuk',
+  SILABUS_RAK: 'Silabus & RAK',
+  QUOTATION: 'Quotation',
+  SPK_DRAF: 'Draf SPK',
+  APPROVAL_1: 'Approval Kadep Marketing',
+  APPROVAL_2: 'Approval Kadep DPS',
+  PERSIAPAN: 'Persiapan',
+  PELAKSANAAN: 'Pelaksanaan',
+  LAPORAN: 'Menunggu BAST',
+  SELESAI: 'Selesai',
+  DITOLAK: 'Tidak sanggup',
+  BATAL: 'Batal',
 };
 
-export const LABEL_TUGAS: Record<StatusTugas, string> = {
-  MENUNGGU_RESPON: 'Menunggu Respons',
-  MENUNGGU_JAWABAN: 'Menunggu Jawaban',
-  DITOLAK_STAFF: 'Ditolak Staff',
-  DITERIMA: 'Diterima',
-  DIKERJAKAN: 'Dikerjakan',
-  DILAPORKAN: 'Laporan Akhir Dikirim',
-  REVISI: 'Perlu Revisi',
-  DISETUJUI: 'Disetujui',
+export const LABEL_CUSTOMER: Record<JenisCustomer, string> = { SWASTA: 'Swasta', BUMN: 'BUMN', INSTITUSI: 'Institusi' };
+
+export const LABEL_PENGAJAR: Record<StatusPengajar, string> = {
+  USULAN: 'Usulan UPT', MENUNGGU: 'Menunggu konfirmasi', BERSEDIA: 'Bersedia', MENOLAK: 'Menolak',
 };
 
-export const LABEL_PRIORITAS: Record<Prioritas, string> = { RENDAH: 'Rendah', SEDANG: 'Sedang', TINGGI: 'Tinggi' };
+export const LABEL_PP: Record<StatusPp, string> = { DIAJUKAN: 'Diajukan', DIPROSES: 'Diproses Purchasing', DITERIMA: 'Barang diterima' };
 
 /** Kelas CSS dari kode enum, mis. MENUNGGU_RESPON → s-menunggu-respon. */
 export function kelasStatus(kode: string): string {

@@ -2,44 +2,30 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import { db } from './db';
 
-export const includePerintah = {
-  spv: true, manager: true, divisi: true,
-  langkah: { orderBy: { urutan: 'asc' } },
+export const includeOrder = {
+  customer: true,
+  marketing: true,
+  unit: true,
+  silabus: true,
+  rakItem: { orderBy: { id: 'asc' } },
+  quotation: { orderBy: { versi: 'desc' } },
+  po: true,
+  spk: { include: { approver1: true, approver2: true } },
+  jadwalLog: { orderBy: { dibuatPada: 'desc' }, include: { oleh: true } },
+  pengajar: { orderBy: { dibuatPada: 'asc' }, include: { pengajar: { include: { unit: true } } } },
+  pp: { orderBy: { dibuatPada: 'asc' } },
+  booking: { include: { fasilitas: true } },
+  laporan: true,
+  bast: true,
   riwayat: { orderBy: { dibuatPada: 'asc' }, include: { oleh: true } },
-} satisfies Prisma.PerintahKerjaInclude;
+} satisfies Prisma.OrderInclude;
 
-export type PerintahLengkap = Prisma.PerintahKerjaGetPayload<{ include: typeof includePerintah }>;
+export type OrderLengkap = Prisma.OrderGetPayload<{ include: typeof includeOrder }>;
 
-export const includePenugasan = {
-  perintah: { include: includePerintah },
-  staff: true,
-  pertanyaan: { orderBy: { ditanyaPada: 'asc' } },
-  actionPlan: { orderBy: { urutan: 'asc' } },
-  laporanHarian: { orderBy: { tanggal: 'desc' }, include: { actionPlan: true } },
-  laporanMingguan: { orderBy: { minggu: 'desc' }, include: { pica: { orderBy: { id: 'asc' } } } },
-  laporanAkhir: { orderBy: { dikirimPada: 'asc' } },
-  evaluasi: { orderBy: { dibuatPada: 'asc' } },
-} satisfies Prisma.PenugasanInclude;
-
-export type PenugasanLengkap = Prisma.PenugasanGetPayload<{ include: typeof includePenugasan }>;
-
-export function ambilPenugasan(id: number) {
-  return db.penugasan.findUnique({ where: { id }, include: includePenugasan });
+export function ambilOrder(id: number) {
+  return db.order.findUnique({ where: { id }, include: includeOrder });
 }
 
-export function ambilPerintah(id: number) {
-  return db.perintahKerja.findUnique({ where: { id }, include: includePerintah });
-}
-
-/** Ringkasan penugasan untuk tabel: progres AP dan jumlah PICA terbuka. */
-export const includeRingkas = {
-  staff: true,
-  perintah: true,
-  actionPlan: { select: { selesai: true } },
-  pertanyaan: { where: { jawaban: null }, select: { id: true } },
-  laporanMingguan: { select: { pica: { where: { status: 'OPEN' }, select: { id: true } } } },
-} satisfies Prisma.PenugasanInclude;
-
-export type PenugasanRingkas = Prisma.PenugasanGetPayload<{ include: typeof includeRingkas }>;
-
-export const picaTerbuka = (p: PenugasanRingkas) => p.laporanMingguan.reduce((n, l) => n + l.pica.length, 0);
+/** Ringkasan untuk tabel/dasbor. */
+export const includeRingkas = { customer: true, marketing: true, unit: true, silabus: { select: { diteruskanPada: true } } } satisfies Prisma.OrderInclude;
+export type OrderRingkas = Prisma.OrderGetPayload<{ include: typeof includeRingkas }>;

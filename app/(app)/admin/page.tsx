@@ -1,42 +1,56 @@
 import Link from 'next/link';
-import { Peran, StatusDokumen, StatusTugas } from '@prisma/client';
+import { Peran } from '@prisma/client';
+import { Form, Submit } from '@/components/Form';
+import { setAktif } from '@/app/actions/akun';
 import { db } from '@/lib/db';
+import { LABEL_PERAN } from '@/lib/format';
 import { wajibLogin } from '@/lib/session';
+import { FormUser } from './FormUser';
 
-export const metadata = { title: 'Ringkasan Admin' };
+export const metadata = { title: 'Pengguna' };
+
+const URUT = Object.values(Peran);
 
 export default async function AdminPage() {
-  await wajibLogin('admin');
-  const [divisi, perPeran, perintah, tugasAktif] = await Promise.all([
-    db.divisi.findMany({ orderBy: { nama: 'asc' }, include: { _count: { select: { users: true, perintah: true } } } }),
-    db.user.groupBy({ by: ['peran'], where: { aktif: true }, _count: true }),
-    db.perintahKerja.count({ where: { status: { in: [StatusDokumen.DISAHKAN, StatusDokumen.DITURUNKAN] } } }),
-    db.penugasan.count({ where: { status: { in: [StatusTugas.DITERIMA, StatusTugas.DIKERJAKAN, StatusTugas.REVISI] } } }),
+  const admin = await wajibLogin('admin');
+  const [users, units] = await Promise.all([
+    db.user.findMany({ include: { unit: true }, orderBy: { nama: 'asc' } }),
+    db.unit.findMany({ orderBy: { nama: 'asc' } }),
   ]);
-  const jml = (p: Peran) => perPeran.find(x => x.peran === p)?._count ?? 0;
+  users.sort((a, b) => URUT.indexOf(a.peran) - URUT.indexOf(b.peran));
   return (
     <>
-      <div className="page-head"><h1>Ringkasan sistem</h1></div>
-      <div className="stats">
-        <Link className="stat" href="/admin/divisi"><div className="stat-label">Divisi</div><div className="stat-value">{divisi.length}</div></Link>
-        <Link className="stat" href="/admin/pengguna"><div className="stat-label">Manager · SPV</div><div className="stat-value">{jml(Peran.manager)} · {jml(Peran.spv)}</div></Link>
-        <Link className="stat" href="/admin/pengguna"><div className="stat-label">Staff aktif</div><div className="stat-value">{jml(Peran.staff)}</div></Link>
-        <div className="stat"><div className="stat-label">Perintah sah</div><div className="stat-value">{perintah}</div></div>
-        <div className="stat"><div className="stat-label">Tugas dikerjakan</div><div className="stat-value">{tugasAktif}</div></div>
-      </div>
+      <div className="page-head"><h1>Pengguna</h1></div>
       <section className="card">
-        <div className="card-head"><h2>Divisi</h2><Link href="/admin/divisi">Kelola divisi</Link></div>
+        <div className="card-head"><h2>Semua akun</h2><span className="small muted">{users.length} akun</span></div>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Kode</th><th>Divisi</th><th className="num">Anggota</th><th className="num">ISPK/SPK</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Peran</th><th>UPT / Prodi</th><th>Status</th><th className="actions">Aksi</th></tr></thead>
             <tbody>
-              {divisi.map(d => (
-                <tr key={d.id}><td><code>{d.kode}</code></td><td>{d.nama}</td><td className="num">{d._count.users}</td><td className="num">{d._count.perintah}</td></tr>
+              {users.map(u => (
+                <tr key={u.id} className={u.aktif ? '' : 'inactive'}>
+                  <td><strong>{u.nama}</strong><br /><span className="small muted">{u.username} · {u.jabatan}</span></td>
+                  <td>{LABEL_PERAN[u.peran]}{u.eksternal && <span className="small muted"> · eksternal</span>}</td>
+                  <td>{u.unit?.nama ?? '—'}</td>
+                  <td><span className={`status ${u.aktif ? 's-aktif' : 's-nonaktif'}`}>{u.aktif ? 'Aktif' : 'Nonaktif'}</span></td>
+                  <td className="actions">
+                    <Link className="btn btn-ghost btn-small" href={`/admin/pengguna/${u.id}`}>Ubah</Link>{' '}
+                    {u.id !== admin.id && (
+                      <Form action={setAktif.bind(null, u.id, !u.aktif)}>
+                        <Submit className={`btn btn-small ${u.aktif ? 'btn-danger' : 'btn-ghost'}`}>{u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</Submit>
+                      </Form>
+                    )}
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+      <details className="card">
+        <summary>Tambah pengguna</summary>
+        <div style={{ maxWidth: 640 }}><FormUser units={units} /></div>
+      </details>
     </>
   );
 }

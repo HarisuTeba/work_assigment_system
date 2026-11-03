@@ -1,5 +1,6 @@
-// Sistem Perintah Kerja (ISPK/SPK) — MySQL Laragon.
-// Nama model ditulis PascalCase, nama tabel di MySQL snake_case lewat @@map.
+// Sistem SPK Eksternal Direktorat 3 Industrial Service — MySQL Laragon.
+// Satu Order mengikuti alur RFQ → Silabus & RAK → Quotation → PO → SPK (2 approval)
+// → persiapan DPS → pelaksanaan → laporan → BAST.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,344 +13,383 @@ datasource db {
 
 enum Peran {
   admin
-  manager
-  spv
-  staff
+  marketing
+  kadep_marketing
+  dps
+  kadep_dps
+  upt
+  pengajar
 }
 
-/// ISPK = proyek internal, SPK = proyek berbasis PO dari klien.
-enum JenisPerintah {
-  ISPK
-  SPK
+enum JenisLayanan {
+  TRAINING
+  SERTIFIKASI
+  KOMBINASI
+  KONSULTASI
+  SEWA_RUANG
 }
 
-enum StatusDokumen {
-  DRAF
-  MENUNGGU_PENGESAHAN
+enum JenisCustomer {
+  SWASTA
+  BUMN
+  INSTITUSI
+}
+
+enum StatusOrder {
+  RFQ
+  SILABUS_RAK
+  QUOTATION
+  SPK_DRAF
+  APPROVAL_1
+  APPROVAL_2
+  PERSIAPAN
+  PELAKSANAAN
+  LAPORAN
+  SELESAI
   DITOLAK
-  DISAHKAN
-  DITURUNKAN
+  BATAL
 }
 
-enum StatusTugas {
-  MENUNGGU_RESPON
-  MENUNGGU_JAWABAN
-  DITOLAK_STAFF
-  DITERIMA
-  DIKERJAKAN
-  DILAPORKAN
-  REVISI
+enum StatusQuotation {
+  DIKIRIM
   DISETUJUI
-}
-
-enum Prioritas {
-  RENDAH
-  SEDANG
-  TINGGI
-}
-
-enum AksiPengesahan {
-  DIAJUKAN
-  DISAHKAN
   DITOLAK
-  DITURUNKAN
+  DIGANTI
 }
 
-enum StatusPica {
-  OPEN
-  CLOSED
+enum JenisPo {
+  PO
+  APPROVAL_QUOTATION
 }
 
-enum Keputusan {
-  setujui
-  revisi
+enum StatusPengajar {
+  USULAN
+  MENUNGGU
+  BERSEDIA
+  MENOLAK
 }
 
-enum JenisReward {
-  otomatis
-  pujian
-  sertifikat
+enum StatusPp {
+  DIAJUKAN
+  DIPROSES
+  DITERIMA
 }
 
-enum TingkatTeguran {
-  Lisan
-  SP1
-  SP2
+enum JenisFasilitas {
+  RUANG_KELAS
+  LABORATORIUM
+  AULA
 }
 
-model Divisi {
-  id        Int      @id @default(autoincrement())
-  /// Kode singkat untuk nomor surat, mis. PMS.
-  kode      String   @unique @db.VarChar(6)
-  nama      String   @unique @db.VarChar(100)
-  createdAt DateTime @default(now())
+model Unit {
+  id    Int    @id @default(autoincrement())
+  /// Kode singkat, mis. INF.
+  kode  String @unique @db.VarChar(8)
+  nama  String @unique @db.VarChar(100)
 
-  users    User[]
-  perintah PerintahKerja[]
+  users  User[]
+  orders Order[]
 
-  @@map("divisi")
+  @@map("unit")
 }
 
 model User {
-  id              Int      @id @default(autoincrement())
-  nama            String   @db.VarChar(100)
-  username        String   @unique @db.VarChar(20)
-  passwordHash    String   @db.VarChar(255)
-  peran           Peran
-  jabatan         String   @db.VarChar(100)
-  divisiId        Int?
-  /// KPI: jumlah maksimum tugas aktif (khusus staff).
-  batasTugasAktif Int      @default(3) @db.TinyInt
-  aktif           Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  nama         String   @db.VarChar(100)
+  username     String   @unique @db.VarChar(20)
+  passwordHash String   @db.VarChar(255)
+  peran        Peran
+  jabatan      String   @db.VarChar(100)
+  /// UPT/Prodi asal (untuk peran upt dan pengajar internal).
+  unitId       Int?
+  /// Pengajar dari luar Politeknik Astra.
+  eksternal    Boolean  @default(false)
+  aktif        Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
-  divisi           Divisi?             @relation(fields: [divisiId], references: [id])
-  perintahDibuat   PerintahKerja[]     @relation("PerintahSpv")
-  perintahDiputus  PerintahKerja[]     @relation("PerintahManager")
-  riwayat          RiwayatPengesahan[]
-  penugasan        Penugasan[]
-  rewardDiterima   Reward[]            @relation("RewardPenerima")
-  rewardDiberi     Reward[]            @relation("RewardPemberi")
-  teguranDiterima  Teguran[]           @relation("TeguranPenerima")
-  teguranDiberi    Teguran[]           @relation("TeguranPemberi")
-  notifikasi       Notifikasi[]
+  unit       Unit?               @relation(fields: [unitId], references: [id])
+  orders     Order[]             @relation("OrderMarketing")
+  riwayat    RiwayatOrder[]
+  penugasan  PenugasanPengajar[]
+  jadwalLog  JadwalLog[]
+  approval1  Spk[]               @relation("Approval1")
+  approval2  Spk[]               @relation("Approval2")
+  notifikasi Notifikasi[]
 
   @@map("users")
 }
 
-model PerintahKerja {
-  id           Int           @id @default(autoincrement())
-  jenis        JenisPerintah
-  /// Nomor resmi, terbit saat disahkan Manager.
-  nomor        String?       @unique @db.VarChar(40)
-  judul        String        @db.VarChar(120)
-  apa          String        @db.Text
-  mengapa      String        @db.Text
-  diMana       String        @db.Text
-  bagaimana    String        @db.Text
-  prioritas    Prioritas
-  tenggat      DateTime
-  status       StatusDokumen @default(DRAF)
-  spvId        Int
-  divisiId     Int
-  managerId    Int?
-  diajukanPada DateTime?
-  disahkanPada DateTime?
-  alasanTolak  String?       @db.Text
+model Customer {
+  id        Int           @id @default(autoincrement())
+  nama      String        @unique @db.VarChar(150)
+  jenis     JenisCustomer
+  pic       String        @db.VarChar(100)
+  email     String?       @db.VarChar(120)
+  telepon   String?       @db.VarChar(30)
+  alamat    String?       @db.Text
+  createdAt DateTime      @default(now())
 
-  // Isian khusus SPK (PO based); kosong untuk ISPK.
-  noPo       String?   @db.VarChar(60)
-  tglPo      DateTime? @db.Date
-  klien      String?   @db.VarChar(120)
-  nilaiPo    Decimal?  @db.Decimal(15, 2)
-  lampiranPo String?   @db.VarChar(255)
+  orders Order[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@map("customer")
+}
 
-  spv       User                @relation("PerintahSpv", fields: [spvId], references: [id])
-  manager   User?               @relation("PerintahManager", fields: [managerId], references: [id])
-  divisi    Divisi              @relation(fields: [divisiId], references: [id])
-  langkah   Langkah[]
-  riwayat   RiwayatPengesahan[]
-  penugasan Penugasan[]
+/// Batas waktu tiap tahap order (hari). Tahap PERSIAPAN & PELAKSANAAN mengikuti tanggal pelaksanaan.
+model Sla {
+  status StatusOrder @id
+  hari   Int         @db.SmallInt
+
+  @@map("sla")
+}
+
+model Order {
+  id            Int          @id @default(autoincrement())
+  nomorRfq      String       @unique @db.VarChar(30)
+  customerId    Int
+  marketingId   Int
+  jenis         JenisLayanan
+  judul         String       @db.VarChar(150)
+  deskripsi     String       @db.Text
+  tglMulai      DateTime     @db.Date
+  tglSelesai    DateTime     @db.Date
+  lokasi        String       @db.VarChar(150)
+  jumlahPeserta Int?         @db.SmallInt
+  /// Atribut khusus per jenis layanan (Dynamic JSON Field).
+  detail        Json
+  status        StatusOrder  @default(RFQ)
+  /// Awal tahap saat ini, untuk menghitung SLA.
+  tahapMulai    DateTime     @default(now())
+  /// Status terakhir yang sudah dikirimi pengingat lewat SLA (agar tidak berulang).
+  pengingatSla  StatusOrder?
+  /// UPT/Prodi yang menyusun silabus & RAK.
+  unitId        Int?
+  alasanTutup   String?      @db.Text
+  createdAt     DateTime     @default(now())
+
+  customer   Customer            @relation(fields: [customerId], references: [id])
+  marketing  User                @relation("OrderMarketing", fields: [marketingId], references: [id])
+  unit       Unit?               @relation(fields: [unitId], references: [id])
+  riwayat    RiwayatOrder[]
+  silabus    Silabus?
+  rakItem    RakItem[]
+  quotation  Quotation[]
+  po         PurchaseOrder?
+  spk        Spk?
+  jadwalLog  JadwalLog[]
+  pengajar   PenugasanPengajar[]
+  pp         PurchaseRequest[]
+  booking    BookingFasilitas[]
+  laporan    LaporanKegiatan?
+  bast       Bast?
 
   @@index([status])
-  @@map("perintah_kerja")
+  @@map("order")
 }
 
-model RiwayatPengesahan {
-  id         Int            @id @default(autoincrement())
-  perintahId Int
+/// Audit trail setiap perubahan tahap dan keputusan.
+model RiwayatOrder {
+  id         Int          @id @default(autoincrement())
+  orderId    Int
   olehId     Int
-  aksi       AksiPengesahan
-  catatan    String?        @db.Text
-  dibuatPada DateTime       @default(now())
+  dari       StatusOrder?
+  ke         StatusOrder
+  catatan    String?      @db.Text
+  dibuatPada DateTime     @default(now())
 
-  perintah PerintahKerja @relation(fields: [perintahId], references: [id], onDelete: Cascade)
-  oleh     User          @relation(fields: [olehId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  oleh  User  @relation(fields: [olehId], references: [id])
 
-  @@map("riwayat_pengesahan")
+  @@map("riwayat_order")
 }
 
-/// Langkah dari SPV; disalin menjadi Action Plan awal tiap staff.
-model Langkah {
-  id         Int    @id @default(autoincrement())
-  perintahId Int
-  urutan     Int    @db.SmallInt
-  deskripsi  String @db.VarChar(255)
+/// Request Silabus & RAK: Marketing → DPS → UPT/Prodi → kembali ke Marketing.
+model Silabus {
+  id               Int       @id @default(autoincrement())
+  orderId          Int       @unique
+  catatanMarketing String?   @db.Text
+  tenggat          DateTime  @db.Date
+  diteruskanPada   DateTime?
+  ringkasan        String?   @db.Text
+  berkas           String?   @db.VarChar(255)
+  dikirimPada      DateTime?
 
-  perintah PerintahKerja @relation(fields: [perintahId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@map("langkah")
+  @@map("silabus")
 }
 
-model Penugasan {
-  id             Int         @id @default(autoincrement())
-  perintahId     Int
-  staffId        Int
-  status         StatusTugas @default(MENUNGGU_RESPON)
-  terlambat      Boolean     @default(false)
-  /// Staff menerima walau tugas aktifnya sudah mencapai batas KPI.
-  diAtasKpi      Boolean     @default(false)
-  alasanTolak    String?     @db.Text
-  diterimaPada   DateTime?
-  dilaporkanPada DateTime?
-  dibuatPada     DateTime    @default(now())
+/// Rancangan Anggaran Kegiatan per item biaya.
+model RakItem {
+  id          Int     @id @default(autoincrement())
+  orderId     Int
+  uraian      String  @db.VarChar(150)
+  volume      Int     @db.SmallInt
+  satuan      String  @db.VarChar(30)
+  hargaSatuan Decimal @db.Decimal(15, 2)
 
-  perintah        PerintahKerja     @relation(fields: [perintahId], references: [id], onDelete: Cascade)
-  staff           User              @relation(fields: [staffId], references: [id])
-  pertanyaan      Pertanyaan[]
-  actionPlan      ActionPlan[]
-  laporanHarian   LaporanHarian[]
-  laporanMingguan LaporanMingguan[]
-  laporanAkhir    LaporanAkhir[]
-  evaluasi        Evaluasi[]
-  reward          Reward[]
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@unique([perintahId, staffId])
-  @@map("penugasan")
+  @@map("rak_item")
 }
 
-model Pertanyaan {
-  id          Int       @id @default(autoincrement())
-  penugasanId Int
-  isi         String    @db.Text
-  jawaban     String?   @db.Text
-  ditanyaPada DateTime  @default(now())
-  dijawabPada DateTime?
+model Quotation {
+  id             Int             @id @default(autoincrement())
+  orderId        Int
+  nomor          String          @unique @db.VarChar(40)
+  versi          Int             @db.SmallInt
+  nilaiRak       Decimal         @db.Decimal(15, 2)
+  marginPersen   Decimal         @db.Decimal(7, 2)
+  nilaiPenawaran Decimal         @db.Decimal(15, 2)
+  berlakuSampai  DateTime        @db.Date
+  catatan        String?         @db.Text
+  status         StatusQuotation @default(DIKIRIM)
+  dibuatPada     DateTime        @default(now())
 
-  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@map("pertanyaan")
+  @@map("quotation")
 }
 
-model ActionPlan {
-  id            Int       @id @default(autoincrement())
-  penugasanId   Int
-  urutan        Int       @db.SmallInt
-  kegiatan      String    @db.VarChar(255)
-  targetTanggal DateTime  @db.Date
-  selesai       Boolean   @default(false)
-  selesaiPada   DateTime?
+model PurchaseOrder {
+  id       Int      @id @default(autoincrement())
+  orderId  Int      @unique
+  jenis    JenisPo
+  nomor    String   @db.VarChar(60)
+  tanggal  DateTime @db.Date
+  nilai    Decimal  @db.Decimal(15, 2)
+  lampiran String?  @db.VarChar(255)
 
-  penugasan Penugasan       @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
-  laporan   LaporanHarian[]
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@map("action_plan")
+  @@map("purchase_order")
 }
 
-model LaporanHarian {
-  id           Int      @id @default(autoincrement())
-  penugasanId  Int
-  tanggal      DateTime @db.Date
-  actionPlanId Int?
-  kegiatan     String   @db.Text
-  /// Progres keseluruhan (% AP selesai) saat laporan dikirim.
-  progres      Int      @db.TinyInt
-  lampiran     String?  @db.VarChar(255)
-  dibuatPada   DateTime @default(now())
+model Spk {
+  id           Int       @id @default(autoincrement())
+  orderId      Int       @unique
+  /// Nomor resmi, terbit setelah approval 2.
+  nomor        String?   @unique @db.VarChar(40)
+  ruangLingkup String    @db.Text
+  budgetRak    Decimal   @db.Decimal(15, 2)
+  nilaiKontrak Decimal   @db.Decimal(15, 2)
+  catatan      String?   @db.Text
+  approval1Id  Int?
+  approval1Pada DateTime?
+  approval2Id  Int?
+  approval2Pada DateTime?
+  alasanTolak  String?   @db.Text
+  dibuatPada   DateTime  @default(now())
 
-  penugasan  Penugasan   @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
-  actionPlan ActionPlan? @relation(fields: [actionPlanId], references: [id], onDelete: SetNull)
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  approver1 User? @relation("Approval1", fields: [approval1Id], references: [id])
+  approver2 User? @relation("Approval2", fields: [approval2Id], references: [id])
 
-  @@unique([penugasanId, tanggal])
-  @@map("laporan_harian")
+  @@map("spk")
 }
 
-model LaporanMingguan {
-  id           Int      @id @default(autoincrement())
-  penugasanId  Int
-  /// Minggu ISO, mis. 2026-W44.
-  minggu       String   @db.VarChar(8)
-  ringkasan    String   @db.Text
-  adaKendala   Boolean
-  tanggapanSpv String?  @db.Text
-  dibuatPada   DateTime @default(now())
+/// Schedule Adjustment Log: perubahan tanggal tanpa membatalkan SPK.
+model JadwalLog {
+  id         Int      @id @default(autoincrement())
+  orderId    Int
+  olehId     Int
+  mulaiLama  DateTime @db.Date
+  selesaiLama DateTime @db.Date
+  mulaiBaru  DateTime @db.Date
+  selesaiBaru DateTime @db.Date
+  alasan     String   @db.Text
+  dibuatPada DateTime @default(now())
 
-  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
-  pica      Pica[]
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  oleh  User  @relation(fields: [olehId], references: [id])
 
-  @@unique([penugasanId, minggu])
-  @@map("laporan_mingguan")
+  @@map("jadwal_log")
 }
 
-/// PICA: Problem Identification & Corrective Action.
-model Pica {
-  id                Int        @id @default(autoincrement())
-  laporanMingguanId Int
-  problem           String     @db.Text
-  identifikasi      String     @db.Text
-  correctiveAction  String     @db.Text
-  pic               String     @db.VarChar(100)
-  dueDate           DateTime   @db.Date
-  status            StatusPica @default(OPEN)
-  ditutupPada       DateTime?
+model PenugasanPengajar {
+  id              Int            @id @default(autoincrement())
+  orderId         Int
+  pengajarId      Int
+  peran           String         @db.VarChar(60)
+  status          StatusPengajar @default(USULAN)
+  alasan          String?        @db.Text
+  nomorSuratTugas String?        @unique @db.VarChar(40)
+  suratTugasPada  DateTime?
+  dibuatPada      DateTime       @default(now())
 
-  laporanMingguan LaporanMingguan @relation(fields: [laporanMingguanId], references: [id], onDelete: Cascade)
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  pengajar User  @relation(fields: [pengajarId], references: [id])
 
-  @@map("pica")
+  @@unique([orderId, pengajarId])
+  @@map("penugasan_pengajar")
 }
 
-model LaporanAkhir {
+/// Permintaan Pembelian (PP) material ke Finance/Purchasing.
+model PurchaseRequest {
+  id            Int      @id @default(autoincrement())
+  orderId       Int
+  item          String   @db.VarChar(150)
+  jumlah        Int      @db.SmallInt
+  satuan        String   @db.VarChar(30)
+  estimasiHarga Decimal  @db.Decimal(15, 2)
+  status        StatusPp @default(DIAJUKAN)
+  dibuatPada    DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_request")
+}
+
+model Fasilitas {
+  id        Int            @id @default(autoincrement())
+  nama      String         @unique @db.VarChar(100)
+  jenis     JenisFasilitas
+  kapasitas Int            @db.SmallInt
+
+  booking BookingFasilitas[]
+
+  @@map("fasilitas")
+}
+
+model BookingFasilitas {
   id          Int      @id @default(autoincrement())
-  penugasanId Int
-  hasil       String   @db.Text
+  orderId     Int
+  fasilitasId Int
+  mulai       DateTime @db.Date
+  selesai     DateTime @db.Date
+
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fasilitas Fasilitas @relation(fields: [fasilitasId], references: [id])
+
+  @@unique([orderId, fasilitasId])
+  @@map("booking_fasilitas")
+}
+
+model LaporanKegiatan {
+  id          Int      @id @default(autoincrement())
+  orderId     Int      @unique
+  ringkasan   String   @db.Text
+  jumlahHadir Int?     @db.SmallInt
   kendala     String?  @db.Text
   lampiran    String?  @db.VarChar(255)
   dikirimPada DateTime @default(now())
 
-  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@map("laporan_akhir")
+  @@map("laporan_kegiatan")
 }
 
-model Evaluasi {
-  id             Int       @id @default(autoincrement())
-  penugasanId    Int
-  skorWaktu      Int       @db.TinyInt
-  skorKualitas   Int       @db.TinyInt
-  skorKesesuaian Int       @db.TinyInt
-  umpanBalik     String?   @db.Text
-  keputusan      Keputusan
-  dibuatPada     DateTime  @default(now())
+/// Berita Acara Serah Terima untuk penagihan customer.
+model Bast {
+  id         Int      @id @default(autoincrement())
+  orderId    Int      @unique
+  nomor      String   @unique @db.VarChar(40)
+  tanggal    DateTime @db.Date
+  catatan    String?  @db.Text
+  dibuatPada DateTime @default(now())
 
-  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@map("evaluasi")
-}
-
-model Reward {
-  id          Int         @id @default(autoincrement())
-  penerimaId  Int
-  pemberiId   Int
-  penugasanId Int?
-  jenis       JenisReward
-  poin        Int         @db.SmallInt
-  pesan       String      @db.VarChar(255)
-  dibuatPada  DateTime    @default(now())
-
-  penerima  User       @relation("RewardPenerima", fields: [penerimaId], references: [id])
-  pemberi   User       @relation("RewardPemberi", fields: [pemberiId], references: [id])
-  penugasan Penugasan? @relation(fields: [penugasanId], references: [id], onDelete: SetNull)
-
-  @@map("reward")
-}
-
-model Teguran {
-  id               Int            @id @default(autoincrement())
-  penerimaId       Int
-  pemberiId        Int
-  tingkat          TingkatTeguran
-  alasan           String         @db.Text
-  catatanPembinaan String         @db.Text
-  dibacaPada       DateTime?
-  dibuatPada       DateTime       @default(now())
-
-  penerima User @relation("TeguranPenerima", fields: [penerimaId], references: [id])
-  pemberi  User @relation("TeguranPemberi", fields: [pemberiId], references: [id])
-
-  @@map("teguran")
+  @@map("bast")
 }
 
 model Notifikasi {

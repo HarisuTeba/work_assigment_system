@@ -1,70 +1,56 @@
 import Link from 'next/link';
-import { Peran, StatusDokumen, StatusTugas } from '@prisma/client';
+import { Peran, StatusOrder, StatusPengajar } from '@prisma/client';
 import { Shell, type ItemNav } from '@/components/Nav';
 import { logout } from '@/app/actions/akun';
 import { db } from '@/lib/db';
 import { LABEL_PERAN, inisial, tanggalPanjang } from '@/lib/format';
-import { refreshTerlambat } from '@/lib/logic/penugasan';
+import { kirimPengingatSla } from '@/lib/logic/order';
+import { beranda } from '@/lib/peran';
 import { wajibLogin, type Pengguna } from '@/lib/session';
 
 async function menu(u: Pengguna): Promise<ItemNav[]> {
-  const peringkat = { href: '/peringkat', label: 'Peringkat' };
+  const dasbor: ItemNav = { href: '/dasbor', label: 'Dasbor order', prefix: '/order' };
   switch (u.peran) {
     case Peran.admin:
       return [
-        { href: '/admin', label: 'Ringkasan', exact: true },
-        { href: '/admin/divisi', label: 'Divisi' },
-        { href: '/admin/pengguna', label: 'Pengguna & KPI' },
+        { href: '/admin', label: 'Pengguna', exact: true, prefix: '/admin/pengguna' },
+        { href: '/admin/master', label: 'Data master & SLA' },
+        dasbor,
       ];
-    case Peran.manager: {
-      const menunggu = await db.perintahKerja.count({ where: { divisiId: u.divisiId!, status: StatusDokumen.MENUNGGU_PENGESAHAN } });
-      return [
-        { href: '/manager', label: 'Ringkasan', exact: true },
-        { href: '/manager/pengesahan', label: 'Pengesahan', count: menunggu },
-        { href: '/manager/rekap', label: 'Rekap KPI & PICA' },
-        peringkat,
-      ];
+    case Peran.marketing: {
+      const n = await db.order.count({ where: { marketingId: u.id, status: { in: [StatusOrder.RFQ, StatusOrder.QUOTATION, StatusOrder.SPK_DRAF, StatusOrder.LAPORAN] } } });
+      return [{ ...dasbor, count: n }, { href: '/order/baru', label: 'RFQ baru', exact: true }];
     }
-    case Peran.spv: {
-      const [perlu, tanya, evaluasi] = await Promise.all([
-        db.perintahKerja.count({ where: { spvId: u.id, status: { in: [StatusDokumen.DITOLAK, StatusDokumen.DISAHKAN] } } }),
-        db.pertanyaan.count({ where: { jawaban: null, penugasan: { perintah: { spvId: u.id } } } }),
-        db.penugasan.count({ where: { status: StatusTugas.DILAPORKAN, perintah: { spvId: u.id } } }),
-      ]);
-      return [
-        { href: '/spv', label: 'Ringkasan', exact: true },
-        { href: '/spv/perintah', label: 'ISPK & SPK', count: perlu },
-        { href: '/spv/penugasan', label: 'Penugasan staff', count: tanya + evaluasi },
-        { href: '/spv/reward', label: 'Reward' },
-        { href: '/spv/teguran', label: 'Teguran' },
-        peringkat,
-      ];
+    case Peran.kadep_marketing:
+    case Peran.kadep_dps: {
+      const n = await db.order.count({ where: { status: u.peran === Peran.kadep_marketing ? StatusOrder.APPROVAL_1 : StatusOrder.APPROVAL_2 } });
+      return [{ href: '/approval', label: 'Antrean approval', count: n }, dasbor];
     }
-    case Peran.staff: {
-      const [baru, teguran] = await Promise.all([
-        db.penugasan.count({ where: { staffId: u.id, status: StatusTugas.MENUNGGU_RESPON } }),
-        db.teguran.count({ where: { penerimaId: u.id, dibacaPada: null } }),
-      ]);
-      return [
-        { href: '/staff', label: 'Perintah kerja', exact: true, prefix: '/staff/tugas', count: baru },
-        { href: '/staff/nilai', label: 'Nilai & reward' },
-        { href: '/staff/teguran', label: 'Teguran', count: teguran },
-        peringkat,
-      ];
+    case Peran.dps: {
+      const n = await db.order.count({ where: { OR: [{ status: StatusOrder.SILABUS_RAK, silabus: { diteruskanPada: null } }, { status: { in: [StatusOrder.PERSIAPAN, StatusOrder.PELAKSANAAN] } }] } });
+      return [{ ...dasbor, count: n }, { href: '/operasional', label: 'Jadwal & operasional' }];
+    }
+    case Peran.upt: {
+      const n = await db.order.count({ where: { unitId: u.unitId, status: StatusOrder.SILABUS_RAK, silabus: { diteruskanPada: { not: null } } } });
+      return [{ href: '/upt', label: 'Request Silabus & RAK', count: n, prefix: '/order' }];
+    }
+    case Peran.pengajar: {
+      const n = await db.penugasanPengajar.count({ where: { pengajarId: u.id, status: StatusPengajar.MENUNGGU } });
+      return [{ href: '/pengajar', label: 'Penugasan mengajar', count: n, prefix: '/order' }];
     }
   }
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await wajibLogin();
-  await refreshTerlambat();
+  await kirimPengingatSla();
   const [nav, belum] = await Promise.all([menu(u), db.notifikasi.count({ where: { userId: u.id, dibaca: false } })]);
-  const sub = [LABEL_PERAN[u.peran], u.divisi?.nama].filter(Boolean).join(' · ');
+  const sub = [LABEL_PERAN[u.peran], u.unit?.nama].filter(Boolean).join(' · ');
 
   return (
     <Shell
       nav={nav}
-      wordmark={<Link href={`/${u.peran}`} className="wordmark">Perintah Kerja</Link>}
+      wordmark={<Link href={beranda(u.peran)} className="wordmark">SPK · Direktorat 3</Link>}
       foot={
         <>
           <Link href="/profil" className="nav-item">Profil & password</Link>

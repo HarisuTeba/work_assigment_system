@@ -1,8 +1,10 @@
 'use server';
 import { redirect } from 'next/navigation';
+import { StatusOrder } from '@prisma/client';
 import { db } from '@/lib/db';
 import { jalankan, str, type Hasil } from '@/lib/aksi';
 import * as Akun from '@/lib/logic/akun';
+import { beranda } from '@/lib/peran';
 import { akhiriSesi, mulaiSesi, wajibLogin } from '@/lib/session';
 
 export async function login(_: Hasil, fd: FormData): Promise<Hasil> {
@@ -10,7 +12,7 @@ export async function login(_: Hasil, fd: FormData): Promise<Hasil> {
     const u = await Akun.login(str(fd, 'username'), str(fd, 'password'));
     await mulaiSesi(u.id, u.peran);
     return u.peran;
-  }, 'Berhasil masuk.', peran => `/${peran}`);
+  }, 'Berhasil masuk.', peran => beranda(peran as Parameters<typeof beranda>[0]));
 }
 
 export async function logout() {
@@ -23,25 +25,40 @@ export async function gantiPassword(_: Hasil, fd: FormData): Promise<Hasil> {
   return jalankan(() => Akun.gantiPassword(u, str(fd, 'lama'), str(fd, 'baru'), str(fd, 'ulang')), 'Password berhasil diganti.');
 }
 
-export async function simpanDivisi(id: number | null, _: Hasil, fd: FormData): Promise<Hasil> {
-  const u = await wajibLogin('admin');
-  return jalankan(() => Akun.simpanDivisi(u, id, { kode: str(fd, 'kode'), nama: str(fd, 'nama') }), id ? 'Divisi diperbarui.' : 'Divisi ditambahkan.');
-}
-
-export async function hapusDivisi(id: number, _: Hasil): Promise<Hasil> {
-  const u = await wajibLogin('admin');
-  return jalankan(() => Akun.hapusDivisi(u, id), 'Divisi dihapus.');
-}
-
 export async function simpanUser(id: number | null, _: Hasil, fd: FormData): Promise<Hasil> {
   const u = await wajibLogin('admin');
-  const d = Object.fromEntries(['nama', 'username', 'peran', 'jabatan', 'divisiId', 'batasTugasAktif', 'password'].map(k => [k, str(fd, k)])) as Akun.DataUser;
-  return jalankan(() => Akun.simpanUser(u, id, d), id ? 'Pengguna diperbarui.' : 'Pengguna ditambahkan.', id ? '/admin/pengguna' : undefined);
+  const d: Akun.DataUser = {
+    nama: str(fd, 'nama'), username: str(fd, 'username'), peran: str(fd, 'peran'), jabatan: str(fd, 'jabatan'),
+    unitId: str(fd, 'unitId'), eksternal: fd.get('eksternal') === 'on', password: str(fd, 'password'),
+  };
+  return jalankan(() => Akun.simpanUser(u, id, d), id ? 'Pengguna diperbarui.' : 'Pengguna ditambahkan.', id ? '/admin' : undefined);
 }
 
 export async function setAktif(id: number, aktif: boolean, _: Hasil): Promise<Hasil> {
   const u = await wajibLogin('admin');
   return jalankan(() => Akun.setAktif(u, id, aktif), aktif ? 'Akun diaktifkan.' : 'Akun dinonaktifkan.');
+}
+
+export async function simpanUnit(id: number | null, _: Hasil, fd: FormData): Promise<Hasil> {
+  const u = await wajibLogin('admin');
+  return jalankan(() => Akun.simpanUnit(u, id, { kode: str(fd, 'kode'), nama: str(fd, 'nama') }), 'UPT/Prodi tersimpan.');
+}
+
+export async function simpanCustomer(id: number | null, _: Hasil, fd: FormData): Promise<Hasil> {
+  const u = await wajibLogin('admin', 'marketing');
+  const d = Object.fromEntries(['nama', 'jenis', 'pic', 'email', 'telepon', 'alamat'].map(k => [k, str(fd, k)])) as Akun.DataCustomer;
+  return jalankan(() => Akun.simpanCustomer(u, id, d), 'Customer tersimpan.');
+}
+
+export async function simpanFasilitas(id: number | null, _: Hasil, fd: FormData): Promise<Hasil> {
+  const u = await wajibLogin('admin');
+  return jalankan(() => Akun.simpanFasilitas(u, id, { nama: str(fd, 'nama'), jenis: str(fd, 'jenis'), kapasitas: str(fd, 'kapasitas') }), 'Fasilitas tersimpan.');
+}
+
+export async function simpanSla(_: Hasil, fd: FormData): Promise<Hasil> {
+  const u = await wajibLogin('admin');
+  const nilai = Object.fromEntries(Object.values(StatusOrder).filter(s => fd.has(`sla_${s}`)).map(s => [s, str(fd, `sla_${s}`)]));
+  return jalankan(() => Akun.simpanSla(u, nilai), 'SLA tersimpan.');
 }
 
 export async function bacaSemuaNotif(_: Hasil): Promise<Hasil> {

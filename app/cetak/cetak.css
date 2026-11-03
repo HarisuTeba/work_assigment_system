@@ -1,0 +1,43 @@
+/* Dokumen cetak A4: selalu terang, tipografi surat resmi. */
+@page { size: A4; margin: 18mm 18mm 20mm; }
+
+.cetak-wrap { background: var(--color-paper-2); min-height: 100vh; padding: var(--space-lg) var(--space-sm); color-scheme: light; }
+.lembar {
+  position: relative; max-width: 210mm; margin: 0 auto; padding: 18mm; background: #fff; color: #111;
+  font: 400 11pt/1.5 var(--font-body); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+.lembar h2 { font: 600 12pt/1.3 var(--font-body); margin: 14pt 0 4pt; color: #111; }
+.lembar p, .lembar ol { margin: 6pt 0; }
+.cetak-bar { max-width: 210mm; margin: 0 auto var(--space-sm); display: flex; gap: var(--space-sm); align-items: center; flex-wrap: wrap; font-size: var(--text-sm); color: var(--color-muted); }
+
+.kop { display: flex; gap: 14pt; align-items: center; padding-bottom: 8pt; border-bottom: 3px double #0a3d7a; }
+.kop-logo { width: 54pt; height: 54pt; display: grid; place-items: center; text-align: center; border: 2px solid #0a3d7a; color: #0a3d7a; font: 700 9pt/1.1 var(--font-body); letter-spacing: 0.06em; }
+.kop-nama { font: 700 16pt/1.1 var(--font-display); color: #0a3d7a; letter-spacing: 0.04em; }
+.kop-unit { font-weight: 600; }
+.kop-alamat { font-size: 9pt; color: #444; }
+.dok-judul { margin: 16pt 0 2pt; text-align: center; font: 700 13pt/1.3 var(--font-body); text-transform: uppercase; letter-spacing: 0.04em; color: #111; }
+.dok-nomor { text-align: center; margin: 0 0 12pt; font-family: var(--font-outlier); font-size: 10pt; }
+
+.dok-tabel { width: 100%; border-collapse: collapse; margin: 6pt 0; font-size: 10.5pt; }
+.dok-tabel th, .dok-tabel td { border: 1px solid #999; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+.dok-tabel th { width: 32%; background: #f0f4fa; font-weight: 600; }
+.dok-tabel thead th { width: auto; }
+.dok-tabel .num { text-align: right; white-space: nowrap; }
+
+.ttd { display: grid; grid-template-columns: 1fr 1fr; gap: 24pt; margin-top: 26pt; break-inside: avoid; }
+.ttd.ttd-3 { grid-template-columns: repeat(3, 1fr); gap: 14pt; }
+.ttd > div { display: flex; flex-direction: column; text-align: center; font-size: 10.5pt; }
+.ttd-ruang { min-height: 48pt; display: grid; place-items: center; color: #0a3d7a; font-size: 9pt; }
+.ttd strong { text-decoration: underline; }
+
+.watermark { position: absolute; inset: 0; display: grid; place-items: center; font: 700 96pt/1 var(--font-body); color: rgb(200 30 30 / 0.08); transform: rotate(-30deg); pointer-events: none; }
+
+@media print {
+  .no-print { display: none !important; }
+  .cetak-wrap { background: none; padding: 0; }
+  .lembar { box-shadow: none; padding: 0; max-width: none; }
+}
+@media (max-width: 760px) {
+  .lembar { padding: var(--space-sm); }
+  .ttd, .ttd.ttd-3 { grid-template-columns: 1fr; }
+}

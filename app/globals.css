@@ -1,5 +1,5 @@
 /* Hallmark · design-system tokens · genre: editorial · theme: Office-memo biru
- * axes: paper-band light (dark via prefers-color-scheme) / roman-serif / cool (Astra blue 255°)
+ * Tema terang saja; tampilan dashboard korporat ditimpa di app/theme.css
  */
 :root {
   /* Kertas & tinta — hangat, condong ke hue 70 */
@@ -76,60 +76,8 @@
   --z-toast:  60;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-paper:      oklch(17% 0.015 255);
-    --color-paper-2:    oklch(21% 0.018 255);
-    --color-sheet:      oklch(23% 0.018 255);
-    --color-rule:       oklch(33% 0.018 255);
-    --color-rule-strong:oklch(80% 0.015 250);
-    --color-neutral:    oklch(62% 0.015 250);
-    --color-muted:      oklch(72% 0.015 250);
-    --color-ink-2:      oklch(84% 0.012 250);
-    --color-ink:        oklch(94% 0.008 250);
-    --color-accent:      oklch(72% 0.12 250);
-    --color-accent-soft: oklch(30% 0.05 255);
-    --color-accent-ink:  oklch(17% 0.015 255);
-    --color-focus:       oklch(74% 0.12 250);
-    --color-good:     oklch(74% 0.10 150);
-    --color-good-soft:oklch(28% 0.04 150);
-    --color-warn:     oklch(78% 0.11 80);
-    --color-warn-soft:oklch(30% 0.045 80);
-    --color-info:     oklch(76% 0.07 220);
-    --color-info-soft:oklch(28% 0.03 220);
-    --color-bad:      oklch(70% 0.14 28);
-    --color-bad-soft: oklch(30% 0.06 28);
-    --color-data:     oklch(74% 0.09 250);
-    --color-data-bg:  oklch(27% 0.018 255);
-    --color-scrim:    oklch(8% 0.01 255 / 0.6);
-  }
-}
-:root[data-theme="dark"] {
-  --color-paper:      oklch(17% 0.015 255);
-  --color-paper-2:    oklch(21% 0.018 255);
-  --color-sheet:      oklch(23% 0.018 255);
-  --color-rule:       oklch(33% 0.018 255);
-  --color-rule-strong:oklch(80% 0.015 250);
-  --color-neutral:    oklch(62% 0.015 250);
-  --color-muted:      oklch(72% 0.015 250);
-  --color-ink-2:      oklch(84% 0.012 250);
-  --color-ink:        oklch(94% 0.008 250);
-  --color-accent:      oklch(72% 0.12 250);
-  --color-accent-soft: oklch(30% 0.05 255);
-  --color-accent-ink:  oklch(17% 0.015 255);
-  --color-focus:       oklch(74% 0.12 250);
-  --color-good:     oklch(74% 0.10 150);
-  --color-good-soft:oklch(28% 0.04 150);
-  --color-warn:     oklch(78% 0.11 80);
-  --color-warn-soft:oklch(30% 0.045 80);
-  --color-info:     oklch(76% 0.07 220);
-  --color-info-soft:oklch(28% 0.03 220);
-  --color-bad:      oklch(70% 0.14 28);
-  --color-bad-soft: oklch(30% 0.06 28);
-  --color-data:     oklch(74% 0.09 250);
-  --color-data-bg:  oklch(27% 0.018 255);
-  --color-scrim:    oklch(8% 0.01 255 / 0.6);
-}
+
+
 
 /* Hallmark · genre: editorial · macrostructure: Ledger (app) + Memo sheet · theme: Office-memo biru
  * design-system: design.md · designed-as-app · nav: N3 side-rail index · footer: none (app)
@@ -148,7 +96,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-@media (prefers-color-scheme: dark) { body { font-weight: 350; } }
+
 
 a { color: var(--color-accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }

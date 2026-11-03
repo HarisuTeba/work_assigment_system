@@ -7,6 +7,7 @@ import { COOKIE, bacaToken } from '@/lib/session-token';
 export async function middleware(req: NextRequest) {
   const t = await bacaToken(req.cookies.get(COOKIE)?.value);
   const { pathname } = req.nextUrl;
+  if (pathname === '/keluar') return NextResponse.next();
   if (pathname === '/login') {
     return t ? NextResponse.redirect(new URL(beranda(t.peran), req.url)) : NextResponse.next();
   }

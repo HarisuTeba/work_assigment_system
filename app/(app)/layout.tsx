@@ -9,34 +9,34 @@ import { beranda } from '@/lib/peran';
 import { wajibLogin, type Pengguna } from '@/lib/session';
 
 async function menu(u: Pengguna): Promise<ItemNav[]> {
-  const dasbor: ItemNav = { href: '/dasbor', label: 'Dasbor order', prefix: '/order' };
+  const dasbor: ItemNav = { href: '/dasbor', label: 'Dasbor order', prefix: '/order', ikon: 'dasbor' };
   switch (u.peran) {
     case Peran.admin:
       return [
-        { href: '/admin', label: 'Pengguna', exact: true, prefix: '/admin/pengguna' },
-        { href: '/admin/master', label: 'Data master & SLA' },
+        { href: '/admin', label: 'Pengguna', exact: true, prefix: '/admin/pengguna', ikon: 'pengguna' },
+        { href: '/admin/master', label: 'Data master & SLA', ikon: 'master' },
         dasbor,
       ];
     case Peran.marketing: {
       const n = await db.order.count({ where: { marketingId: u.id, status: { in: [StatusOrder.RFQ, StatusOrder.QUOTATION, StatusOrder.SPK_DRAF, StatusOrder.LAPORAN] } } });
-      return [{ ...dasbor, count: n }, { href: '/order/baru', label: 'RFQ baru', exact: true }];
+      return [{ ...dasbor, count: n }, { href: '/order/baru', label: 'RFQ baru', exact: true, ikon: 'tambah' }];
     }
     case Peran.kadep_marketing:
     case Peran.kadep_dps: {
       const n = await db.order.count({ where: { status: u.peran === Peran.kadep_marketing ? StatusOrder.APPROVAL_1 : StatusOrder.APPROVAL_2 } });
-      return [{ href: '/approval', label: 'Antrean approval', count: n }, dasbor];
+      return [{ href: '/approval', label: 'Antrean approval', count: n, ikon: 'approval' }, dasbor];
     }
     case Peran.dps: {
       const n = await db.order.count({ where: { OR: [{ status: StatusOrder.SILABUS_RAK, silabus: { diteruskanPada: null } }, { status: { in: [StatusOrder.PERSIAPAN, StatusOrder.PELAKSANAAN] } }] } });
-      return [{ ...dasbor, count: n }, { href: '/operasional', label: 'Jadwal & operasional' }];
+      return [{ ...dasbor, count: n }, { href: '/operasional', label: 'Jadwal & operasional', ikon: 'kalender' }];
     }
     case Peran.upt: {
       const n = await db.order.count({ where: { unitId: u.unitId, status: StatusOrder.SILABUS_RAK, silabus: { diteruskanPada: { not: null } } } });
-      return [{ href: '/upt', label: 'Request Silabus & RAK', count: n, prefix: '/order' }];
+      return [{ href: '/upt', label: 'Request Silabus & RAK', count: n, prefix: '/order', ikon: 'dokumen' }];
     }
     case Peran.pengajar: {
       const n = await db.penugasanPengajar.count({ where: { pengajarId: u.id, status: StatusPengajar.MENUNGGU } });
-      return [{ href: '/pengajar', label: 'Penugasan mengajar', count: n, prefix: '/order' }];
+      return [{ href: '/pengajar', label: 'Penugasan mengajar', count: n, prefix: '/order', ikon: 'pengajar' }];
     }
   }
 }
@@ -50,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <Shell
       nav={nav}
-      wordmark={<Link href={beranda(u.peran)} className="wordmark">SPK · Direktorat 3</Link>}
+      wordmark={<Link href={beranda(u.peran)} className="wordmark"><span className="wm-logo" aria-hidden>D3</span><span><strong>Sistem SPK</strong><small>Direktorat 3 · Industrial Service</small></span></Link>}
       foot={
         <>
           <Link href="/profil" className="nav-item">Profil & password</Link>

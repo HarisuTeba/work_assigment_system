@@ -30,7 +30,7 @@ export type Pengguna = NonNullable<Awaited<ReturnType<typeof penggunaSaatIni>>>;
 /** Wajib login (dan peran tertentu bila diberikan); jika tidak, kembali ke login/beranda. */
 export async function wajibLogin(...peran: Peran[]): Promise<Pengguna> {
   const u = await penggunaSaatIni();
-  if (!u) redirect('/login');
+  if (!u) redirect('/keluar');
   if (peran.length && !peran.includes(u.peran)) redirect(beranda(u.peran));
   return u;
 }

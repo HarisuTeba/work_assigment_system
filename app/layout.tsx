@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from 'next/font/google';
+import { IBM_Plex_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import './app.css';
+import './theme.css';
 
-const display = Newsreader({ subsets: ['latin'], weight: ['600'], variable: '--f-display', display: 'swap' });
-const body = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '600'], variable: '--f-body', display: 'swap' });
+const sans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--f-body', display: 'swap' });
 const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['500'], variable: '--f-mono', display: 'swap' });
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="id" className={`${sans.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

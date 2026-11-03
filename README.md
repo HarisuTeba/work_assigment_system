@@ -1,83 +1,96 @@
-# Sistem Pemberian Perintah & Tugas
+# Sistem Pemberian Perintah Kerja (ISPK/SPK)
 
-Aplikasi web untuk mendigitalkan pemberian perintah dari atasan ke bawahan, lengkap dengan konfirmasi pemahaman, pengerjaan langkah demi langkah, laporan, evaluasi, reward, dan teguran (pembinaan).
-Dibuat untuk mata kuliah **Teknik Supervisi**.
+Aplikasi web untuk tugas **Teknik Supervisi**. Aplikasi ini mendigitalkan pemberian perintah kerja dari Supervisor (SPV) ke staff, mengikuti alur di ASTRAtech:
 
-## Cara menjalankan
+1. **SPV menerbitkan** perintah kerja:
+   - **ISPK**: proyek internal.
+   - **SPK**: proyek berbasis PO, dilengkapi nomor PO, tanggal PO, klien, nilai PO, dan lampiran dokumen PO.
+2. **Manager divisi meninjau.**
+   - Jika **disahkan**, nomor resmi terbit, misalnya `SPK/001/PMS/X/2026`.
+   - Jika **ditolak**, alasan wajib diisi dan SPV merevisi lalu mengajukan ulang.
+3. **SPV menurunkan** perintah yang sudah sah ke satu atau beberapa staff.
+4. **Staff merespons.** Staff boleh bertanya dulu, lalu **menerima** atau **menolak**.
+   - Jika jumlah tugas aktifnya sudah mencapai **batas KPI**, sistem menampilkan **alert** terlebih dahulu.
+   - Staff boleh menolak dengan alasan beban kerja.
+5. **Staff mengerjakan dan melapor:**
+   - **Action Plan (AP)** sebagai rencana kegiatan.
+   - **Laporan harian** per AP.
+   - **Laporan mingguan.** Jika ada kendala kinerja, **PICA** (Problem, Identification, Corrective Action, PIC, due date) wajib diisi.
+6. **Laporan akhir** dikirim setelah semua AP selesai.
+   - SPV mengevaluasi tiga aspek dengan skor 1–5, lalu menyetujui atau meminta revisi.
+   - Poin otomatis = rata-rata skor × 10, ditambah 10 jika tepat waktu.
+7. **Reward dan teguran.** Sistem menyarankan teguran jika dalam 30 hari terakhir staff:
+   - terlambat ≥ 2 kali,
+   - nilai rata-rata < 3, atau
+   - tidak mengirim laporan harian ≥ 3 hari kerja.
 
-Tidak perlu instalasi. Cukup buka `index.html` di browser (Chrome, Edge, atau Firefox).
+   Keputusan memberi teguran tetap di tangan SPV.
 
-Cara lain adalah lewat server lokal:
+## Peran
 
-```bash
-python -m http.server 5173
-```
+| Peran | Wewenang |
+|---|---|
+| Admin | Kelola divisi, akun, dan batas tugas aktif (KPI) tiap staff |
+| Manager | Sahkan atau tolak ISPK/SPK divisinya; pantau rekap KPI dan PICA |
+| Supervisor (SPV) | Terbitkan dan revisi ISPK/SPK, turunkan ke staff, jawab pertanyaan, tanggapi laporan, evaluasi, beri reward dan teguran |
+| Staff | Terima atau tolak perintah, isi AP, laporan harian, laporan mingguan + PICA, dan laporan akhir |
 
-Setelah itu buka <http://localhost:5173>.
+## Teknologi
 
-Data tersimpan di **localStorage** browser. Tombol **Reset data demo** (di halaman login atau Profil) mengembalikan semua data ke contoh awal.
+- **Next.js 15** (App Router, Server Actions, TypeScript)
+- **MySQL 8** bawaan **Laragon**, diakses lewat **Prisma ORM** (`prisma/schema.prisma`)
+- Login dengan **bcrypt** dan cookie sesi bertanda tangan (`jose`); middleware membatasi area tiap peran
+- Lampiran PDF/JPG/PNG maksimal 2 MB, disimpan di `storage/uploads/` dan hanya bisa dibuka pengguna yang sudah login
+
+Versi prototipe lama (HTML + localStorage) diarsipkan di folder `legacy/`.
+
+## Menjalankan dengan Laragon
+
+1. Buka Laragon, lalu klik **Start All** agar MySQL berjalan di port 3306.
+2. Salin konfigurasi:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Isi `SESSION_SECRET` dengan string acak minimal 32 karakter. `DATABASE_URL` bawaan sudah sesuai Laragon: user `root` tanpa password, database `perintah_kerja`.
+3. Pasang dependensi, buat database, dan isi data demo:
+
+   ```bash
+   npm install
+   npx prisma migrate dev
+   npx prisma db seed
+   ```
+4. Jalankan:
+
+   ```bash
+   npm run dev
+   ```
+
+   Lalu buka http://localhost:3000.
+
+Untuk mengembalikan data demo ke kondisi awal, jalankan `npm run db:reset`.
 
 ## Akun demo
 
 Semua akun memakai password `demo123`.
 
-| Username | Peran | Keterangan |
+| Username | Peran | Catatan |
 |---|---|---|
-| `admin` | Admin | Kelola divisi & pengguna |
-| `budi` | Atasan | Kepala Bagian Pemasaran |
-| `siti`, `andi`, `dewi` | Bawahan | Staf Pemasaran (Dewi sengaja dibuat perlu pembinaan) |
-| `rina` | Atasan | Kepala Bagian Keuangan |
-| `joko`, `maya`, `fajar` | Bawahan | Staf Keuangan |
+| admin | Admin | — |
+| hendra / lestari | Manager Pemasaran / Keuangan | hendra punya 1 ISPK yang menunggu pengesahan |
+| budi / siti | SPV Pemasaran / Keuangan | budi punya SPK ditolak, perintah sah yang belum diturunkan, PICA open, dan laporan akhir yang menunggu evaluasi |
+| andi | Staff | Sedang mengerjakan SPK dengan PICA open; punya 1 pertanyaan yang belum dijawab |
+| dewi | Staff | KPI penuh (2/2), sehingga alert muncul saat membuka perintah baru |
+| rina | Staff | Sering terlambat dan laporan harian bolong, sehingga muncul saran teguran SP1 |
+| joko, maya, fajar | Staff Keuangan | — |
 
-## Alur bisnis
-
-1. **Admin** membuat divisi dan akun. Relasi atasan–bawahan ditentukan oleh divisi.
-2. **Atasan** membuat perintah dengan:
-   - jenis (tertulis atau lisan; perintah lisan wajib dicatat ringkasannya)
-   - sifat (langsung, permintaan, anjuran, atau sukarela)
-   - prioritas
-   - instruksi **5W1H**
-   - **langkah berurutan**
-
-   Satu perintah bisa dikirim ke beberapa bawahan, dan tiap bawahan mendapat penugasan sendiri.
-3. **Bawahan** wajib **konfirmasi paham** atau mengajukan pertanyaan dulu. Langkah pengerjaan terkunci sampai konfirmasi dilakukan.
-4. Bawahan mengerjakan langkah **satu per satu**: langkah berikutnya terbuka setelah langkah sebelumnya selesai. Setelah semua langkah selesai, bawahan mengirim **laporan akhir**.
-5. **Atasan mengevaluasi** dengan skor 1–5 untuk ketepatan waktu, kualitas, dan kesesuaian instruksi, ditambah umpan balik. Hasilnya **Setujui** atau **Revisi** (atasan bisa membuka ulang langkah tertentu).
-6. **Reward**:
-   - Saat disetujui, poin otomatis = rata-rata skor × 10, ditambah 10 jika tepat waktu.
-   - Atasan bisa memberi pujian (poin bonus 0–20) atau sertifikat "Karyawan Teladan".
-   - Papan peringkat per divisi.
-7. **Teguran**: sistem memberi saran bila dalam 30 hari staf terlambat ≥ 2 kali atau nilai rata-ratanya < 3. Atasan memutuskan tingkatnya (Lisan, SP1, atau SP2) dan menulis catatan pembinaan. Bawahan menandai teguran sudah dibaca.
-
-Status penugasan: `Baru → Menunggu Jawaban → Dikonfirmasi → Dikerjakan → Dilaporkan → Disetujui` (atau `Perlu Revisi`). Penanda **Terlambat** muncul otomatis bila tenggat terlewati.
-
-## Kaitan dengan materi
-
-| Materi | Fitur |
-|---|---|
-| Perintah lisan / tertulis | Pilihan jenis + catatan bukti perintah lisan |
-| Instruksi jelas | Form 5W1H wajib |
-| Satu per satu | Langkah berurutan yang terkunci |
-| Memastikan bawahan paham | Konfirmasi wajib + tanya-jawab klarifikasi |
-| Pengawasan | Progres per langkah, penanda terlambat, dashboard tim |
-| Evaluasi | Skor 3 aspek, umpan balik, revisi |
-| Reward | Poin otomatis, pujian, sertifikat, peringkat |
-| Pembinaan / teguran | Saran sistem + teguran bertingkat + catatan pembinaan |
-| Tugas supervisor | Merencanakan, membagi tugas, mengontrol, menilai, membina |
-
-## Struktur file
+## Struktur
 
 ```
-index.html
-design.md           sistem desain (warna, tipografi, aturan komponen)
-tokens.css          token warna/spasi/font (terang + gelap)
-css/style.css
-js/store.js         penyimpanan localStorage
-js/logic.js         aturan bisnis (validasi, status, poin, saran teguran)
-js/seed.js          data contoh
-js/ui.js            helper tampilan
-js/pages/*.js       halaman per peran (common, admin, atasan, bawahan)
-js/app.js           router & layout
+app/(app)/{admin,manager,spv,staff}/   halaman per peran
+app/actions/                           Server Actions (memanggil lib/logic)
+lib/logic/                             aturan bisnis: perintah, penugasan, laporan, evaluasi, rekap
+components/                            lembar surat, laporan (AP/harian/mingguan/PICA/akhir), tabel
+prisma/schema.prisma, prisma/seed.ts   skema MySQL dan data demo
 ```
-
-> Catatan: aplikasi ini adalah prototipe. Password hanya di-hash sederhana dan data disimpan di browser, jadi aplikasi ini tidak untuk dipakai di produksi.

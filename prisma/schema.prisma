@@ -1,0 +1,367 @@
+// Sistem Perintah Kerja (ISPK/SPK) — MySQL Laragon.
+// Nama model ditulis PascalCase, nama tabel di MySQL snake_case lewat @@map.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Peran {
+  admin
+  manager
+  spv
+  staff
+}
+
+/// ISPK = proyek internal, SPK = proyek berbasis PO dari klien.
+enum JenisPerintah {
+  ISPK
+  SPK
+}
+
+enum StatusDokumen {
+  DRAF
+  MENUNGGU_PENGESAHAN
+  DITOLAK
+  DISAHKAN
+  DITURUNKAN
+}
+
+enum StatusTugas {
+  MENUNGGU_RESPON
+  MENUNGGU_JAWABAN
+  DITOLAK_STAFF
+  DITERIMA
+  DIKERJAKAN
+  DILAPORKAN
+  REVISI
+  DISETUJUI
+}
+
+enum Prioritas {
+  RENDAH
+  SEDANG
+  TINGGI
+}
+
+enum AksiPengesahan {
+  DIAJUKAN
+  DISAHKAN
+  DITOLAK
+  DITURUNKAN
+}
+
+enum StatusPica {
+  OPEN
+  CLOSED
+}
+
+enum Keputusan {
+  setujui
+  revisi
+}
+
+enum JenisReward {
+  otomatis
+  pujian
+  sertifikat
+}
+
+enum TingkatTeguran {
+  Lisan
+  SP1
+  SP2
+}
+
+model Divisi {
+  id        Int      @id @default(autoincrement())
+  /// Kode singkat untuk nomor surat, mis. PMS.
+  kode      String   @unique @db.VarChar(6)
+  nama      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  users    User[]
+  perintah PerintahKerja[]
+
+  @@map("divisi")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  nama            String   @db.VarChar(100)
+  username        String   @unique @db.VarChar(20)
+  passwordHash    String   @db.VarChar(255)
+  peran           Peran
+  jabatan         String   @db.VarChar(100)
+  divisiId        Int?
+  /// KPI: jumlah maksimum tugas aktif (khusus staff).
+  batasTugasAktif Int      @default(3) @db.TinyInt
+  aktif           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  divisi           Divisi?             @relation(fields: [divisiId], references: [id])
+  perintahDibuat   PerintahKerja[]     @relation("PerintahSpv")
+  perintahDiputus  PerintahKerja[]     @relation("PerintahManager")
+  riwayat          RiwayatPengesahan[]
+  penugasan        Penugasan[]
+  rewardDiterima   Reward[]            @relation("RewardPenerima")
+  rewardDiberi     Reward[]            @relation("RewardPemberi")
+  teguranDiterima  Teguran[]           @relation("TeguranPenerima")
+  teguranDiberi    Teguran[]           @relation("TeguranPemberi")
+  notifikasi       Notifikasi[]
+
+  @@map("users")
+}
+
+model PerintahKerja {
+  id           Int           @id @default(autoincrement())
+  jenis        JenisPerintah
+  /// Nomor resmi, terbit saat disahkan Manager.
+  nomor        String?       @unique @db.VarChar(40)
+  judul        String        @db.VarChar(120)
+  apa          String        @db.Text
+  mengapa      String        @db.Text
+  diMana       String        @db.Text
+  bagaimana    String        @db.Text
+  prioritas    Prioritas
+  tenggat      DateTime
+  status       StatusDokumen @default(DRAF)
+  spvId        Int
+  divisiId     Int
+  managerId    Int?
+  diajukanPada DateTime?
+  disahkanPada DateTime?
+  alasanTolak  String?       @db.Text
+
+  // Isian khusus SPK (PO based); kosong untuk ISPK.
+  noPo       String?   @db.VarChar(60)
+  tglPo      DateTime? @db.Date
+  klien      String?   @db.VarChar(120)
+  nilaiPo    Decimal?  @db.Decimal(15, 2)
+  lampiranPo String?   @db.VarChar(255)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  spv       User                @relation("PerintahSpv", fields: [spvId], references: [id])
+  manager   User?               @relation("PerintahManager", fields: [managerId], references: [id])
+  divisi    Divisi              @relation(fields: [divisiId], references: [id])
+  langkah   Langkah[]
+  riwayat   RiwayatPengesahan[]
+  penugasan Penugasan[]
+
+  @@index([status])
+  @@map("perintah_kerja")
+}
+
+model RiwayatPengesahan {
+  id         Int            @id @default(autoincrement())
+  perintahId Int
+  olehId     Int
+  aksi       AksiPengesahan
+  catatan    String?        @db.Text
+  dibuatPada DateTime       @default(now())
+
+  perintah PerintahKerja @relation(fields: [perintahId], references: [id], onDelete: Cascade)
+  oleh     User          @relation(fields: [olehId], references: [id])
+
+  @@map("riwayat_pengesahan")
+}
+
+/// Langkah dari SPV; disalin menjadi Action Plan awal tiap staff.
+model Langkah {
+  id         Int    @id @default(autoincrement())
+  perintahId Int
+  urutan     Int    @db.SmallInt
+  deskripsi  String @db.VarChar(255)
+
+  perintah PerintahKerja @relation(fields: [perintahId], references: [id], onDelete: Cascade)
+
+  @@map("langkah")
+}
+
+model Penugasan {
+  id             Int         @id @default(autoincrement())
+  perintahId     Int
+  staffId        Int
+  status         StatusTugas @default(MENUNGGU_RESPON)
+  terlambat      Boolean     @default(false)
+  /// Staff menerima walau tugas aktifnya sudah mencapai batas KPI.
+  diAtasKpi      Boolean     @default(false)
+  alasanTolak    String?     @db.Text
+  diterimaPada   DateTime?
+  dilaporkanPada DateTime?
+  dibuatPada     DateTime    @default(now())
+
+  perintah        PerintahKerja     @relation(fields: [perintahId], references: [id], onDelete: Cascade)
+  staff           User              @relation(fields: [staffId], references: [id])
+  pertanyaan      Pertanyaan[]
+  actionPlan      ActionPlan[]
+  laporanHarian   LaporanHarian[]
+  laporanMingguan LaporanMingguan[]
+  laporanAkhir    LaporanAkhir[]
+  evaluasi        Evaluasi[]
+  reward          Reward[]
+
+  @@unique([perintahId, staffId])
+  @@map("penugasan")
+}
+
+model Pertanyaan {
+  id          Int       @id @default(autoincrement())
+  penugasanId Int
+  isi         String    @db.Text
+  jawaban     String?   @db.Text
+  ditanyaPada DateTime  @default(now())
+  dijawabPada DateTime?
+
+  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+
+  @@map("pertanyaan")
+}
+
+model ActionPlan {
+  id            Int       @id @default(autoincrement())
+  penugasanId   Int
+  urutan        Int       @db.SmallInt
+  kegiatan      String    @db.VarChar(255)
+  targetTanggal DateTime  @db.Date
+  selesai       Boolean   @default(false)
+  selesaiPada   DateTime?
+
+  penugasan Penugasan       @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  laporan   LaporanHarian[]
+
+  @@map("action_plan")
+}
+
+model LaporanHarian {
+  id           Int      @id @default(autoincrement())
+  penugasanId  Int
+  tanggal      DateTime @db.Date
+  actionPlanId Int?
+  kegiatan     String   @db.Text
+  /// Progres keseluruhan (% AP selesai) saat laporan dikirim.
+  progres      Int      @db.TinyInt
+  lampiran     String?  @db.VarChar(255)
+  dibuatPada   DateTime @default(now())
+
+  penugasan  Penugasan   @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  actionPlan ActionPlan? @relation(fields: [actionPlanId], references: [id], onDelete: SetNull)
+
+  @@unique([penugasanId, tanggal])
+  @@map("laporan_harian")
+}
+
+model LaporanMingguan {
+  id           Int      @id @default(autoincrement())
+  penugasanId  Int
+  /// Minggu ISO, mis. 2026-W44.
+  minggu       String   @db.VarChar(8)
+  ringkasan    String   @db.Text
+  adaKendala   Boolean
+  tanggapanSpv String?  @db.Text
+  dibuatPada   DateTime @default(now())
+
+  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+  pica      Pica[]
+
+  @@unique([penugasanId, minggu])
+  @@map("laporan_mingguan")
+}
+
+/// PICA: Problem Identification & Corrective Action.
+model Pica {
+  id                Int        @id @default(autoincrement())
+  laporanMingguanId Int
+  problem           String     @db.Text
+  identifikasi      String     @db.Text
+  correctiveAction  String     @db.Text
+  pic               String     @db.VarChar(100)
+  dueDate           DateTime   @db.Date
+  status            StatusPica @default(OPEN)
+  ditutupPada       DateTime?
+
+  laporanMingguan LaporanMingguan @relation(fields: [laporanMingguanId], references: [id], onDelete: Cascade)
+
+  @@map("pica")
+}
+
+model LaporanAkhir {
+  id          Int      @id @default(autoincrement())
+  penugasanId Int
+  hasil       String   @db.Text
+  kendala     String?  @db.Text
+  lampiran    String?  @db.VarChar(255)
+  dikirimPada DateTime @default(now())
+
+  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+
+  @@map("laporan_akhir")
+}
+
+model Evaluasi {
+  id             Int       @id @default(autoincrement())
+  penugasanId    Int
+  skorWaktu      Int       @db.TinyInt
+  skorKualitas   Int       @db.TinyInt
+  skorKesesuaian Int       @db.TinyInt
+  umpanBalik     String?   @db.Text
+  keputusan      Keputusan
+  dibuatPada     DateTime  @default(now())
+
+  penugasan Penugasan @relation(fields: [penugasanId], references: [id], onDelete: Cascade)
+
+  @@map("evaluasi")
+}
+
+model Reward {
+  id          Int         @id @default(autoincrement())
+  penerimaId  Int
+  pemberiId   Int
+  penugasanId Int?
+  jenis       JenisReward
+  poin        Int         @db.SmallInt
+  pesan       String      @db.VarChar(255)
+  dibuatPada  DateTime    @default(now())
+
+  penerima  User       @relation("RewardPenerima", fields: [penerimaId], references: [id])
+  pemberi   User       @relation("RewardPemberi", fields: [pemberiId], references: [id])
+  penugasan Penugasan? @relation(fields: [penugasanId], references: [id], onDelete: SetNull)
+
+  @@map("reward")
+}
+
+model Teguran {
+  id               Int            @id @default(autoincrement())
+  penerimaId       Int
+  pemberiId        Int
+  tingkat          TingkatTeguran
+  alasan           String         @db.Text
+  catatanPembinaan String         @db.Text
+  dibacaPada       DateTime?
+  dibuatPada       DateTime       @default(now())
+
+  penerima User @relation("TeguranPenerima", fields: [penerimaId], references: [id])
+  pemberi  User @relation("TeguranPemberi", fields: [pemberiId], references: [id])
+
+  @@map("teguran")
+}
+
+model Notifikasi {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  pesan      String   @db.VarChar(255)
+  tautan     String   @db.VarChar(255)
+  dibaca     Boolean  @default(false)
+  dibuatPada DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dibaca])
+  @@map("notifikasi")
+}

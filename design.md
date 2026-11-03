@@ -23,12 +23,13 @@ editorial — office-memo register ("surat perintah" printed on warm paper)
 - **Login**: quiet letter-shaped page, left-biased, no hero art.
 
 ## Theme
-Tokens live in `tokens.css` (light + dark, both designed).
+Tokens live in `app/globals.css` (light + dark, both designed); the old warm/brick set is archived in `legacy/tokens.css`.
 - `--color-paper`  oklch(96.5% 0.012 85)  · dark oklch(17% 0.010 60)
 - `--color-sheet`  oklch(98.5% 0.008 90)  · dark oklch(23% 0.012 62)
 - `--color-ink`    oklch(20% 0.012 55)    · dark oklch(93% 0.010 85)
 - `--color-rule`   oklch(84% 0.014 75)    · dark oklch(33% 0.012 60)
-- `--color-accent` oklch(50% 0.16 32) brick / stamp red · dark oklch(70% 0.13 35)
+- `--color-accent` oklch(45% 0.15 255) biru Politeknik Astra · dark oklch(72% 0.12 250)
+- `--color-bad`    oklch(50% 0.17 28) merah untuk ditolak/terlambat/teguran · dark oklch(70% 0.14 28)
 - Status colours (good / warn / info / bad) always ship with a text label.
 
 ## Typography
@@ -73,4 +74,4 @@ pattern (serif h2 + hairline, no eyebrows).
 ## Exports
 
 ### tokens.css
-See `/tokens.css` (canonical).
+See `app/globals.css` (canonical).

@@ -1,4 +1,4 @@
-import { JenisPo, Peran, StatusOrder, StatusPengajar, StatusPp, StatusQuotation, type Fasilitas, type Unit, type User } from '@prisma/client';
+import { JenisPo, Peran, StatusOrder, StatusPengajar, StatusPp, StatusQuotation, type Fasilitas, type Pengajar, type Unit } from '@prisma/client';
 import Link from 'next/link';
 import { Peringatan, StatusPgj } from '../badges';
 import { Form, Submit } from '../Form';
@@ -71,7 +71,7 @@ export function PanelAnalisis({ o, u, units }: P & { units: Unit[] }) {
   );
 }
 
-export function SeksiSilabus({ o, u, units, pengajar }: P & { units: Unit[]; pengajar: (User & { unit: Unit | null })[] }) {
+export function SeksiSilabus({ o, u, units, pengajar }: P & { units: Unit[]; pengajar: (Pengajar & { unit: Unit | null })[] }) {
   const s = o.silabus;
   if (!s) return null;
   const rak = totalRak(o.rakItem);
@@ -281,7 +281,7 @@ export function SeksiSpk({ o, u }: P) {
 // ---------- Tahap 4: persiapan operasional DPS ----------
 
 export function SeksiOperasional({ o, u, pengajar, fasilitas, bentrok }: P & {
-  pengajar: (User & { unit: Unit | null })[]; fasilitas: Fasilitas[]; bentrok: Record<number, string>;
+  pengajar: (Pengajar & { unit: Unit | null })[]; fasilitas: Fasilitas[]; bentrok: Record<number, string>;
 }) {
   if (!di(o, StatusOrder.PERSIAPAN, StatusOrder.PELAKSANAAN, StatusOrder.LAPORAN, StatusOrder.SELESAI)) return null;
   const dps = ya(u, Peran.dps);
@@ -304,7 +304,17 @@ export function SeksiOperasional({ o, u, pengajar, fasilitas, bentrok }: P & {
               <tr key={p.id}>
                 <td><strong>{p.pengajar.nama}</strong><br /><span className="small muted">{p.pengajar.eksternal ? 'Eksternal' : p.pengajar.unit?.nama}</span></td>
                 <td>{p.peran}</td>
-                <td><StatusPgj s={p.status} />{p.alasan && <div className="small muted">{p.alasan}</div>}</td>
+                <td>
+                  <StatusPgj s={p.status} />{p.alasan && <div className="small muted">{p.alasan}</div>}
+                  {dps && persiapan && p.status === StatusPengajar.MENUNGGU && (
+                    <Form action={A.konfirmasiPengajar.bind(null, p.id)} className="form-inline konfirmasi">
+                      <label className="sr-only" htmlFor={`al-${p.id}`}>Alasan bila tidak bersedia</label>
+                      <input id={`al-${p.id}`} name="alasan" placeholder="Alasan bila tidak bersedia" />
+                      <Submit name="jawab" value="bersedia" className="btn btn-ghost btn-small">Bersedia</Submit>
+                      <Submit name="jawab" value="tidak" className="btn btn-danger btn-small">Tidak bersedia</Submit>
+                    </Form>
+                  )}
+                </td>
                 <td>
                   {p.nomorSuratTugas
                     ? <Link href={`/cetak/surat-tugas/${p.id}`} target="_blank">{p.nomorSuratTugas}</Link>

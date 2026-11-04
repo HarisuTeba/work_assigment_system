@@ -1,6 +1,6 @@
 import { JenisCustomer, JenisFasilitas, StatusOrder } from '@prisma/client';
 import { Form, Submit } from '@/components/Form';
-import { simpanCustomer, simpanFasilitas, simpanSla, simpanUnit } from '@/app/actions/akun';
+import { simpanCustomer, simpanFasilitas, simpanPengajar, simpanSla, simpanUnit } from '@/app/actions/akun';
 import { db } from '@/lib/db';
 import { LABEL_CUSTOMER, LABEL_STATUS } from '@/lib/format';
 import { SLA_DEFAULT } from '@/lib/logic/aturan';
@@ -13,11 +13,12 @@ const LABEL_FASILITAS: Record<JenisFasilitas, string> = { RUANG_KELAS: 'Ruang ke
 
 export default async function MasterPage() {
   await wajibLogin('admin');
-  const [units, customer, fasilitas, peta] = await Promise.all([
+  const [units, customer, fasilitas, peta, pengajar] = await Promise.all([
     db.unit.findMany({ orderBy: { nama: 'asc' } }),
     db.customer.findMany({ orderBy: { nama: 'asc' }, include: { _count: { select: { orders: true } } } }),
     db.fasilitas.findMany({ orderBy: { nama: 'asc' } }),
     petaSla(),
+    db.pengajar.findMany({ include: { unit: true }, orderBy: [{ eksternal: 'asc' }, { nama: 'asc' }] }),
   ]);
   return (
     <>
@@ -57,6 +58,46 @@ export default async function MasterPage() {
           </Form>
         </section>
       </div>
+
+      <section className="card">
+        <div className="card-head"><h2>Pengajar</h2><span className="small muted">tidak login; kesediaan dicatat DPS</span></div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Nama</th><th>Jabatan / keahlian</th><th>UPT / Prodi</th><th>Telepon</th><th>Aktif</th><th /></tr></thead>
+            <tbody>
+              {pengajar.map(p => (
+                <tr key={p.id} className={p.aktif ? '' : 'inactive'}>
+                  <td colSpan={6}>
+                    <Form action={simpanPengajar.bind(null, p.id)} className="form-inline pengajar-row">
+                      <input name="nama" defaultValue={p.nama} aria-label="Nama" required />
+                      <input name="jabatan" defaultValue={p.jabatan} aria-label="Jabatan" required />
+                      <select name="unitId" defaultValue={p.unitId ?? ''} aria-label="UPT/Prodi">
+                        <option value="">— Eksternal —</option>
+                        {units.map(x => <option key={x.id} value={x.id}>{x.nama}</option>)}
+                      </select>
+                      <input name="telepon" defaultValue={p.telepon ?? ''} aria-label="Telepon" />
+                      <label className="check"><input type="checkbox" name="eksternal" defaultChecked={p.eksternal} /> Eksternal</label>
+                      <label className="check"><input type="checkbox" name="aktif" defaultChecked={p.aktif} /> Aktif</label>
+                      <Submit className="btn btn-ghost btn-small">Simpan</Submit>
+                    </Form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Form action={simpanPengajar.bind(null, null)} className="form-inline pengajar-row" reset>
+          <input name="nama" placeholder="Nama pengajar baru" aria-label="Nama pengajar baru" required />
+          <input name="jabatan" placeholder="Jabatan / keahlian" aria-label="Jabatan" required />
+          <select name="unitId" defaultValue="" aria-label="UPT/Prodi">
+            <option value="">— Eksternal —</option>
+            {units.map(x => <option key={x.id} value={x.id}>{x.nama}</option>)}
+          </select>
+          <input name="telepon" placeholder="Telepon" aria-label="Telepon" />
+          <label className="check"><input type="checkbox" name="eksternal" /> Eksternal</label>
+          <Submit className="btn btn-ghost">Tambah</Submit>
+        </Form>
+      </section>
 
       <section className="card">
         <div className="card-head"><h2>Fasilitas (ruang & lab)</h2></div>

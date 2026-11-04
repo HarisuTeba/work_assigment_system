@@ -1,4 +1,4 @@
-import { JenisLayanan, Peran, StatusOrder, StatusPengajar, type Order } from '@prisma/client';
+import { JenisLayanan, Peran, StatusOrder, type Order } from '@prisma/client';
 import { db } from '../db';
 import { gagal, teks, wajib } from '../errors';
 import { BUTUH_PESERTA, LAYANAN, type Detail } from '../layanan';
@@ -13,13 +13,12 @@ export function wajibPeran(u: Pengguna, ...peran: Peran[]) {
   if (!peran.includes(u.peran)) gagal('Anda tidak memiliki akses untuk tindakan ini.');
 }
 
-/** Order yang boleh dilihat pengguna: peran pusat melihat semua, UPT hanya unitnya, pengajar hanya penugasannya. */
+/** Order yang boleh dilihat pengguna: peran pusat melihat semua, UPT hanya order unitnya. */
 export async function orderTerlihat(u: Pengguna, id: number) {
-  const o = await db.order.findUnique({ where: { id }, include: { pengajar: { select: { pengajarId: true, status: true } } } });
+  const o = await db.order.findUnique({ where: { id } });
   const boleh = !!o && (
     LIHAT_SEMUA.includes(u.peran)
     || (u.peran === Peran.upt && o.unitId === u.unitId)
-    || (u.peran === Peran.pengajar && o.pengajar.some(p => p.pengajarId === u.id && p.status !== StatusPengajar.USULAN))
   );
   if (!boleh) gagal('Order tidak ditemukan.');
   return o!;
@@ -215,8 +214,8 @@ export async function ubahJadwal(u: Pengguna, id: number, d: { tglMulai: string;
     await tx.order.update({ where: { id }, data: { tglMulai, tglSelesai } });
     await tx.bookingFasilitas.updateMany({ where: { orderId: id }, data: { mulai: tglMulai, selesai: tglSelesai } });
     await catat(tx, id, o.status, u.id, `Jadwal diubah: ${alasan}`);
-    const pengajar = await tx.penugasanPengajar.findMany({ where: { orderId: id, status: { in: [StatusPengajar.MENUNGGU, StatusPengajar.BERSEDIA] } } });
-    await notifyBanyak(tx, [o.marketingId, ...pengajar.map(p => p.pengajarId)].filter(x => x !== u.id), `Jadwal ${o.nomorRfq} "${o.judul}" berubah.`, `/order/${id}`);
+    const lain = u.peran === Peran.marketing ? await idPeran(tx, Peran.dps) : [o.marketingId];
+    await notifyBanyak(tx, lain, `Jadwal ${o.nomorRfq} "${o.judul}" berubah; konfirmasi ulang pengajar bila perlu.`, `/order/${id}`);
   });
 }
 

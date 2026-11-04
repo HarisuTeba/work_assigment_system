@@ -29,7 +29,7 @@ export async function simpanUser(id: number | null, _: Hasil, fd: FormData): Pro
   const u = await wajibLogin('admin');
   const d: Akun.DataUser = {
     nama: str(fd, 'nama'), username: str(fd, 'username'), peran: str(fd, 'peran'), jabatan: str(fd, 'jabatan'),
-    unitId: str(fd, 'unitId'), eksternal: fd.get('eksternal') === 'on', password: str(fd, 'password'),
+    unitId: str(fd, 'unitId'), password: str(fd, 'password'),
   };
   return jalankan(() => Akun.simpanUser(u, id, d), id ? 'Pengguna diperbarui.' : 'Pengguna ditambahkan.', id ? '/admin' : undefined);
 }
@@ -64,4 +64,12 @@ export async function simpanSla(_: Hasil, fd: FormData): Promise<Hasil> {
 export async function bacaSemuaNotif(_: Hasil): Promise<Hasil> {
   const u = await wajibLogin();
   return jalankan(() => db.notifikasi.updateMany({ where: { userId: u.id, dibaca: false }, data: { dibaca: true } }), 'Semua notifikasi ditandai dibaca.');
+}
+
+export async function simpanPengajar(id: number | null, _: Hasil, fd: FormData): Promise<Hasil> {
+  const u = await wajibLogin('admin');
+  return jalankan(() => Akun.simpanPengajar(u, id, {
+    nama: str(fd, 'nama'), jabatan: str(fd, 'jabatan'), unitId: str(fd, 'unitId'), telepon: str(fd, 'telepon'),
+    eksternal: fd.get('eksternal') === 'on', aktif: id ? fd.get('aktif') === 'on' : true,
+  }), 'Pengajar tersimpan.');
 }

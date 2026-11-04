@@ -27,7 +27,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const persiapan = o.status === StatusOrder.PERSIAPAN && u.peran === Peran.dps;
   const [units, pengajar, fasilitas, peta] = await Promise.all([
     db.unit.findMany({ orderBy: { nama: 'asc' } }),
-    db.user.findMany({ where: { peran: Peran.pengajar, aktif: true }, include: { unit: true }, orderBy: [{ eksternal: 'asc' }, { nama: 'asc' }] }),
+    db.pengajar.findMany({ where: { aktif: true }, include: { unit: true }, orderBy: [{ eksternal: 'asc' }, { nama: 'asc' }] }),
     persiapan ? db.fasilitas.findMany({ orderBy: { nama: 'asc' } }) : Promise.resolve([]),
     petaSla(),
   ]);

@@ -24,7 +24,7 @@ export async function gantiPassword(u: Pengguna, lama: string, baru: string, ula
 
 // ---------- Pengguna ----------
 
-export type DataUser = { nama: string; username: string; peran: string; jabatan: string; unitId: string; eksternal: boolean; password: string };
+export type DataUser = { nama: string; username: string; peran: string; jabatan: string; unitId: string; password: string };
 
 export async function simpanUser(admin: Pengguna, id: number | null, d: DataUser) {
   wajibAdmin(admin);
@@ -35,9 +35,8 @@ export async function simpanUser(admin: Pengguna, id: number | null, d: DataUser
   if (!(d.peran in Peran)) gagal('Peran tidak valid.');
   const peran = d.peran as Peran;
   const jabatan = wajib(d.jabatan, 'Jabatan');
-  const eksternal = peran === Peran.pengajar && d.eksternal;
   let unitId: number | null = null;
-  if (peran === Peran.upt || (peran === Peran.pengajar && !eksternal)) {
+  if (peran === Peran.upt) {
     unitId = Number(d.unitId);
     if (!unitId || !(await db.unit.findUnique({ where: { id: unitId } }))) gagal('Pilih UPT/Prodi untuk peran ini.');
   }
@@ -46,7 +45,7 @@ export async function simpanUser(admin: Pengguna, id: number | null, d: DataUser
   if (id && pw && pw.length < 6) gagal('Password baru minimal 6 karakter.');
   if (id === admin.id && peran !== Peran.admin) gagal('Anda tidak bisa mengubah peran akun sendiri.');
 
-  const data = { nama, username, peran, jabatan, unitId, eksternal, ...(pw ? { passwordHash: await bcrypt.hash(pw, 10) } : {}) };
+  const data = { nama, username, peran, jabatan, unitId, ...(pw ? { passwordHash: await bcrypt.hash(pw, 10) } : {}) };
   if (id) await db.user.update({ where: { id }, data });
   else await db.user.create({ data: { ...data, passwordHash: data.passwordHash! } });
 }
@@ -110,4 +109,21 @@ export async function simpanSla(admin: Pengguna, nilai: Partial<Record<StatusOrd
     return { status: status as StatusOrder, hari };
   });
   await db.$transaction(baris.map(b => db.sla.upsert({ where: { status: b.status }, create: b, update: { hari: b.hari } })));
+}
+
+export type DataPengajar = { nama: string; jabatan: string; unitId: string; eksternal: boolean; telepon: string; aktif: boolean };
+
+/** Pengajar adalah data master (tidak login); internal wajib punya UPT/Prodi asal. */
+export async function simpanPengajar(admin: Pengguna, id: number | null, d: DataPengajar) {
+  wajibAdmin(admin);
+  const nama = wajib(d.nama, 'Nama pengajar');
+  const jabatan = wajib(d.jabatan, 'Jabatan / keahlian');
+  let unitId: number | null = null;
+  if (!d.eksternal) {
+    unitId = Number(d.unitId);
+    if (!unitId || !(await db.unit.findUnique({ where: { id: unitId } }))) gagal('Pilih UPT/Prodi untuk pengajar internal.');
+  }
+  const data = { nama, jabatan, unitId, eksternal: d.eksternal, telepon: teks(d.telepon) || null, aktif: d.aktif };
+  if (id) await db.pengajar.update({ where: { id }, data });
+  else await db.pengajar.create({ data });
 }

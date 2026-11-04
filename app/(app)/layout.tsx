@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Peran, StatusOrder, StatusPengajar } from '@prisma/client';
+import { Peran, StatusOrder } from '@prisma/client';
 import { Shell, type ItemNav } from '@/components/Nav';
 import { logout } from '@/app/actions/akun';
 import { db } from '@/lib/db';
@@ -33,10 +33,6 @@ async function menu(u: Pengguna): Promise<ItemNav[]> {
     case Peran.upt: {
       const n = await db.order.count({ where: { unitId: u.unitId, status: StatusOrder.SILABUS_RAK, silabus: { diteruskanPada: { not: null } } } });
       return [{ href: '/upt', label: 'Request Silabus & RAK', count: n, prefix: '/order', ikon: 'dokumen' }];
-    }
-    case Peran.pengajar: {
-      const n = await db.penugasanPengajar.count({ where: { pengajarId: u.id, status: StatusPengajar.MENUNGGU } });
-      return [{ href: '/pengajar', label: 'Penugasan mengajar', count: n, prefix: '/order', ikon: 'pengajar' }];
     }
   }
 }

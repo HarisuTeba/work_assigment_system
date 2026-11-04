@@ -3,8 +3,8 @@ import { db } from '../db';
 import { gagal, teks, wajib } from '../errors';
 import type { Pengguna } from '../session';
 import { HARI } from '../waktu';
-import { LEAD_TIME_PP, STATUS_TUTUP, notify, notifyBanyak } from './aturan';
-import { catat, idPeran, nomorBaru, notifyMarketing, orderDiTahap, pindahTahap, wajibPeran } from './order';
+import { LEAD_TIME_PP, STATUS_TUTUP } from './aturan';
+import { catat, nomorBaru, notifyMarketing, orderDiTahap, pindahTahap, wajibPeran } from './order';
 
 /** Status penugasan pengajar yang mengikat jadwal. */
 const MENGIKAT: StatusPengajar[] = [StatusPengajar.MENUNGGU, StatusPengajar.BERSEDIA];
@@ -32,37 +32,36 @@ export async function bentrokFasilitas(fasilitasId: number, mulai: Date, selesai
 
 // ---------- Pengajar ----------
 
-/** DPS menetapkan pengajar (dari usulan UPT atau pilihan lain); pengajar lalu diminta konfirmasi. */
+/** DPS menetapkan pengajar (dari usulan UPT atau pilihan lain), lalu menghubunginya untuk konfirmasi. */
 export async function tetapkanPengajar(dps: Pengguna, id: number, pengajarId: number, peran: string) {
   wajibPeran(dps, Peran.dps);
   const o = await orderDiTahap(id, StatusOrder.PERSIAPAN);
-  const p = await db.user.findFirst({ where: { id: pengajarId, peran: Peran.pengajar, aktif: true } });
+  const p = await db.pengajar.findFirst({ where: { id: pengajarId, aktif: true } });
   if (!p) gagal('Pilih pengajar yang aktif.');
   const ada = await db.penugasanPengajar.findUnique({ where: { orderId_pengajarId: { orderId: id, pengajarId } } });
   if (ada && ada.status !== StatusPengajar.USULAN && ada.status !== StatusPengajar.MENOLAK) gagal(`${p.nama} sudah ditetapkan.`);
   const lain = await bentrokPengajar(pengajarId, o.tglMulai, o.tglSelesai, id);
   if (lain) gagal(`Jadwal bentrok: ${p.nama} sudah bertugas di ${lain} pada tanggal yang sama.`);
   const r = wajib(peran, 'Peran pengajar').slice(0, 60);
-  await db.$transaction(async tx => {
-    await tx.penugasanPengajar.upsert({
-      where: { orderId_pengajarId: { orderId: id, pengajarId } },
-      create: { orderId: id, pengajarId, peran: r, status: StatusPengajar.MENUNGGU },
-      update: { peran: r, status: StatusPengajar.MENUNGGU, alasan: null },
-    });
-    await notify(tx, pengajarId, `Konfirmasi ketersediaan mengajar: ${o.judul}`, '/pengajar');
+  await db.penugasanPengajar.upsert({
+    where: { orderId_pengajarId: { orderId: id, pengajarId } },
+    create: { orderId: id, pengajarId, peran: r, status: StatusPengajar.MENUNGGU },
+    update: { peran: r, status: StatusPengajar.MENUNGGU, alasan: null },
   });
 }
 
-export async function konfirmasiPengajar(pengajar: Pengguna, penugasanId: number, bersedia: boolean, alasan: string) {
-  wajibPeran(pengajar, Peran.pengajar);
-  const t = await db.penugasanPengajar.findUnique({ where: { id: penugasanId }, include: { order: true } });
-  if (!t || t.pengajarId !== pengajar.id) gagal('Penugasan tidak ditemukan.');
+/** Pengajar tidak login; DPS mencatat jawaban kesediaan pengajar setelah menghubunginya. */
+export async function konfirmasiPengajar(dps: Pengguna, penugasanId: number, bersedia: boolean, alasan: string) {
+  wajibPeran(dps, Peran.dps);
+  const t = await db.penugasanPengajar.findUnique({ where: { id: penugasanId }, include: { order: true, pengajar: true } });
+  if (!t) gagal('Penugasan tidak ditemukan.');
+  await orderDiTahap(t.orderId, StatusOrder.PERSIAPAN);
   if (t.status !== StatusPengajar.MENUNGGU) gagal('Penugasan ini sudah dikonfirmasi.');
   const a = teks(alasan);
   if (!bersedia && !a) gagal('Tuliskan alasan tidak bersedia.');
   await db.$transaction(async tx => {
     await tx.penugasanPengajar.update({ where: { id: penugasanId }, data: { status: bersedia ? StatusPengajar.BERSEDIA : StatusPengajar.MENOLAK, alasan: a || null } });
-    await notifyBanyak(tx, await idPeran(tx, Peran.dps), `${pengajar.nama} ${bersedia ? 'bersedia' : 'tidak bersedia'} mengajar ${t.order.nomorRfq}${a ? `: ${a}` : ''}`, `/order/${t.orderId}`);
+    await catat(tx, t.orderId, t.order.status, dps.id, `${t.pengajar.nama} ${bersedia ? 'bersedia' : 'tidak bersedia'} mengajar${a ? `: ${a}` : ''}`);
   });
 }
 
@@ -75,10 +74,7 @@ export async function terbitkanSuratTugas(dps: Pengguna, penugasanId: number) {
   if (t.status !== StatusPengajar.BERSEDIA) gagal('Surat Tugas hanya untuk pengajar yang sudah bersedia.');
   if (t.nomorSuratTugas) gagal('Surat Tugas sudah terbit.');
   const nomor = await nomorBaru(p => db.penugasanPengajar.count({ where: { nomorSuratTugas: p } }), 'ST', 'DPS');
-  await db.$transaction(async tx => {
-    await tx.penugasanPengajar.update({ where: { id: penugasanId }, data: { nomorSuratTugas: nomor, suratTugasPada: new Date() } });
-    await notify(tx, t.pengajarId, `Surat Tugas ${nomor} terbit untuk ${t.order.judul}`, '/pengajar');
-  });
+  await db.penugasanPengajar.update({ where: { id: penugasanId }, data: { nomorSuratTugas: nomor, suratTugasPada: new Date() } });
 }
 
 // ---------- Pengadaan (PP) & fasilitas ----------

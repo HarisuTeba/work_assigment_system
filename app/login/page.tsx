@@ -10,7 +10,6 @@ const DEMO = [
   ['dps', 'DPS'],
   ['kadepdps', 'Kadep DPS'],
   ['upt.inf', 'UPT / Prodi'],
-  ['rudi', 'Pengajar'],
   ['admin', 'Admin'],
 ];
 

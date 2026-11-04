@@ -20,7 +20,7 @@ Aplikasi web untuk tugas **Teknik Supervisi**. Aplikasi ini mendigitalkan alur o
    - Nomor SPK terbit per jenis layanan, misalnya `SPK/006/TRN/D3/XI/2026`.
 5. **Persiapan (DPS):**
    - Tetapkan pengajar; sistem **mendeteksi jadwal bentrok**.
-   - Pengajar mengonfirmasi bersedia/tidak, lalu DPS menerbitkan **Surat Tugas**.
+   - DPS menghubungi pengajar dan mencatat jawabannya (bersedia/tidak), lalu menerbitkan **Surat Tugas**.
    - Ajukan PP pengadaan; sistem memberi peringatan bila diajukan < 14 hari sebelum pelaksanaan.
    - Booking ruang/lab, dengan cek bentrok dan kapasitas.
 6. **Pelaksanaan dan laporan kegiatan DPS.** Setelah itu Marketing menerbitkan **BAST** untuk penagihan, dan order selesai.
@@ -61,15 +61,14 @@ Nilai SLA bisa diubah Admin.
 
 | Peran | Wewenang |
 |---|---|
-| Admin | Pengguna, UPT/Prodi, customer, fasilitas, SLA |
+| Admin | Pengguna, UPT/Prodi, pengajar, customer, fasilitas, SLA |
 | Marketing | RFQ, analisis, quotation & margin, PO, draft SPK, BAST |
 | Kadep Marketing | Approval 1 SPK |
-| DPS | Teruskan request ke UPT, pengajar & Surat Tugas, PP, fasilitas, laporan kegiatan |
+| DPS | Teruskan request ke UPT, tetapkan pengajar & catat kesediaannya, Surat Tugas, PP, fasilitas, laporan kegiatan |
 | Kadep DPS | Approval 2 SPK |
 | UPT / Prodi | Silabus/RPS, RAK, usulan pengajar |
-| Pengajar | Konfirmasi penugasan, jadwal, Surat Tugas |
 
-Customer eksternal tidak login; datanya dikelola Marketing/Admin.
+Customer dan pengajar tidak login. Data customer dikelola Marketing/Admin, data pengajar dikelola Admin, dan kesediaan pengajar dicatat oleh DPS.
 
 ## Dokumen cetak
 
@@ -119,10 +118,9 @@ Semua akun memakai password `demo123`.
 | dps | DPS |
 | kadepdps | Kadep DPS (ada SPK menunggu approval 2) |
 | upt.inf / upt.mka | UPT Informatika / UPT Mekatronika |
-| rudi, ayu, bayu, hendro | Pengajar (hendro eksternal; ayu punya penugasan menunggu konfirmasi) |
 | admin | Admin |
 
-Data demo berisi 14 order di semua tahap, termasuk:
+Data demo berisi 14 order di semua tahap dan 4 pengajar (Rudi, Ayu, Bayu, Hendro sebagai eksternal), termasuk:
 - order yang lewat SLA,
 - pengajar yang bentrok jadwal (Rudi di "Training Cyber Security Awareness"),
 - PP yang diajukan kurang dari 14 hari sebelum pelaksanaan.

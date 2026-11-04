@@ -132,8 +132,7 @@ export async function kirimLaporan(id: number, _: Hasil, fd: FormData): Promise<
   }), 'Laporan kegiatan terkirim ke Marketing.');
 }
 
-// ---------- Pengajar ----------
 export async function konfirmasiPengajar(penugasanId: number, _: Hasil, fd: FormData): Promise<Hasil> {
-  const u = await wajibLogin('pengajar');
-  return jalankan(() => Op.konfirmasiPengajar(u, penugasanId, str(fd, 'jawab') === 'bersedia', str(fd, 'alasan')), 'Konfirmasi terkirim ke DPS.');
+  const u = await wajibLogin('dps');
+  return jalankan(() => Op.konfirmasiPengajar(u, penugasanId, str(fd, 'jawab') === 'bersedia', str(fd, 'alasan')), 'Konfirmasi pengajar dicatat.');
 }

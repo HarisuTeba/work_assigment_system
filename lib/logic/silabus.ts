@@ -49,7 +49,7 @@ export async function kirimSilabusRak(
   if (!items.length) gagal('Isi minimal 1 item RAK.');
   const ids = [...new Set(d.pengajarIds.filter(Boolean))];
   if (ids.length) {
-    const ok = await db.user.count({ where: { id: { in: ids }, peran: Peran.pengajar, aktif: true } });
+    const ok = await db.pengajar.count({ where: { id: { in: ids }, aktif: true } });
     if (ok !== ids.length) gagal('Usulan pengajar tidak valid.');
   }
 

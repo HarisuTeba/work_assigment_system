@@ -54,7 +54,7 @@ async function main() {
     db.purchaseRequest.deleteMany(), db.penugasanPengajar.deleteMany(), db.jadwalLog.deleteMany(), db.spk.deleteMany(),
     db.purchaseOrder.deleteMany(), db.quotation.deleteMany(), db.rakItem.deleteMany(), db.silabus.deleteMany(),
     db.riwayatOrder.deleteMany(), db.order.deleteMany(), db.fasilitas.deleteMany(), db.sla.deleteMany(),
-    db.customer.deleteMany(), db.user.deleteMany(), db.unit.deleteMany(),
+    db.customer.deleteMany(), db.pengajar.deleteMany(), db.user.deleteMany(), db.unit.deleteMany(),
   ]);
   await mkdir(DIR, { recursive: true });
   await Promise.all([
@@ -69,8 +69,8 @@ async function main() {
   await db.unit.create({ data: { kode: 'TPM', nama: 'Prodi Teknik Produksi' } });
 
   const hash = await bcrypt.hash('demo123', 10);
-  const u = (username: string, nama: string, peran: Peran, jabatan: string, unitId: number | null = null, eksternal = false) =>
-    db.user.create({ data: { username, nama, peran, jabatan, unitId, eksternal, passwordHash: hash } });
+  const u = (username: string, nama: string, peran: Peran, jabatan: string, unitId: number | null = null) =>
+    db.user.create({ data: { username, nama, peran, jabatan, unitId, passwordHash: hash } });
   const admin = await u('admin', 'Admin Sistem', Peran.admin, 'Administrator Sistem');
   const sinta = await u('marketing', 'Sinta Maharani', Peran.marketing, 'Marketing Training, Konsultasi & Sertifikasi');
   const kadepMkt = await u('kadepmkt', 'Yudi Hartono', Peran.kadep_marketing, 'Kepala Departemen Marketing');
@@ -78,10 +78,13 @@ async function main() {
   const kadepDps = await u('kadepdps', 'Agus Salim', Peran.kadep_dps, 'Kepala Departemen DPS');
   const uptInf = await u('upt.inf', 'Dimas Prakoso', Peran.upt, 'Kepala UPT Informatika', inf.id);
   const uptMkt = await u('upt.mka', 'Ratna Sari', Peran.upt, 'Kepala UPT Mekatronika', mkt.id);
-  const rudi = await u('rudi', 'Rudi Hermawan', Peran.pengajar, 'Dosen Informatika', inf.id);
-  const ayu = await u('ayu', 'Ayu Lestari', Peran.pengajar, 'Dosen Informatika', inf.id);
-  const bayu = await u('bayu', 'Bayu Saputra', Peran.pengajar, 'Dosen Mekatronika', mkt.id);
-  const hendro = await u('hendro', 'Hendro Wibowo', Peran.pengajar, 'Konsultan Lean Manufacturing', null, true);
+  // Pengajar adalah data master, tidak login.
+  const pgj = (nama: string, jabatan: string, unitId: number | null, telepon: string) =>
+    db.pengajar.create({ data: { nama, jabatan, unitId, eksternal: unitId == null, telepon } });
+  const rudi = await pgj('Rudi Hermawan', 'Dosen Informatika', inf.id, '0812-3000-1001');
+  const ayu = await pgj('Ayu Lestari', 'Dosen Informatika', inf.id, '0812-3000-1002');
+  const bayu = await pgj('Bayu Saputra', 'Dosen Mekatronika', mkt.id, '0812-3000-1003');
+  const hendro = await pgj('Hendro Wibowo', 'Konsultan Lean Manufacturing', null, '0812-3000-1004');
   void admin;
 
   const c = (nama: string, jenis: JenisCustomer, pic: string, telepon: string) => db.customer.create({ data: { nama, jenis, pic, telepon, email: `${pic.split(' ')[0].toLowerCase()}@contoh.co.id` } });
@@ -253,7 +256,7 @@ async function main() {
     data: [
       { userId: kadepMkt.id, pesan: 'Approval 1 SPK: Workshop Industri 4.0 untuk Dosen', tautan: '/approval', dibuatPada: t(0, 8) },
       { userId: kadepDps.id, pesan: 'Approval 2 SPK: Sewa Lab PLC untuk Pelatihan Internal', tautan: '/approval', dibuatPada: t(0, 8) },
-      { userId: ayu.id, pesan: 'Konfirmasi ketersediaan mengajar: Training Embedded System untuk Teknisi Produksi', tautan: '/pengajar', dibuatPada: t(-1, 13) },
+      { userId: dps.id, pesan: 'Hubungi Ayu Lestari untuk konfirmasi mengajar: Training Embedded System untuk Teknisi Produksi', tautan: '/operasional', dibuatPada: t(-1, 13) },
       { userId: uptInf.id, pesan: 'Request Silabus & RAK: Training IoT untuk Maintenance Prediktif', tautan: '/upt', dibuatPada: t(-9, 14) },
     ],
   });

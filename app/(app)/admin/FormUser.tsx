@@ -3,7 +3,7 @@ import { Form, Submit } from '@/components/Form';
 import { simpanUser } from '@/app/actions/akun';
 import { LABEL_PERAN } from '@/lib/format';
 
-/** Form tambah/ubah pengguna. UPT/Prodi wajib untuk peran UPT dan pengajar internal. */
+/** Form tambah/ubah pengguna. UPT/Prodi wajib untuk peran UPT. */
 export function FormUser({ user, units }: { user?: User; units: Unit[] }) {
   return (
     <Form action={simpanUser.bind(null, user?.id ?? null)} className="stack" reset={!user}>
@@ -23,7 +23,6 @@ export function FormUser({ user, units }: { user?: User; units: Unit[] }) {
           </select>
         </label>
       </div>
-      <label className="check"><input type="checkbox" name="eksternal" defaultChecked={user?.eksternal} /> Pengajar eksternal (dari luar Politeknik Astra)</label>
       <label>{user ? 'Password baru (kosongkan bila tetap)' : 'Password'}
         <input type="password" name="password" autoComplete="new-password" minLength={6} required={!user} />
       </label>

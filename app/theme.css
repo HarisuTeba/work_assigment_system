@@ -313,3 +313,9 @@ h3.sub { border-top: 0; margin-top: var(--space-md); color: var(--color-accent-2
 /* Login ringkas: hanya identitas aplikasi, tanpa rincian alur */
 .login-intro { justify-content: center; }
 .login-intro .wordmark { border-bottom: 0; padding: 0; margin-bottom: var(--space-md); }
+
+.pengajar-row { flex-wrap: wrap; align-items: center; }
+.pengajar-row input:not([type="checkbox"]), .pengajar-row select { flex: 1; min-width: 140px; }
+.pengajar-row label.check { flex-direction: row; white-space: nowrap; }
+.konfirmasi { margin-top: 6px; flex-wrap: wrap; }
+.konfirmasi input { min-width: 160px; flex: 1; padding: 5px 8px; font-size: 0.85rem; }

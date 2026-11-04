@@ -8,7 +8,6 @@ export const LABEL_PERAN: Record<Peran, string> = {
   dps: 'DPS',
   kadep_dps: 'Kadep DPS',
   upt: 'UPT / Prodi',
-  pengajar: 'Pengajar',
 };
 
 export const LABEL_STATUS: Record<StatusOrder, string> = {

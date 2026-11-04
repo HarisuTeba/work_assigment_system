@@ -30,7 +30,7 @@ export default async function AdminPage() {
               {users.map(u => (
                 <tr key={u.id} className={u.aktif ? '' : 'inactive'}>
                   <td><strong>{u.nama}</strong><br /><span className="small muted">{u.username} · {u.jabatan}</span></td>
-                  <td>{LABEL_PERAN[u.peran]}{u.eksternal && <span className="small muted"> · eksternal</span>}</td>
+                  <td>{LABEL_PERAN[u.peran]}</td>
                   <td>{u.unit?.nama ?? '—'}</td>
                   <td><span className={`status ${u.aktif ? 's-aktif' : 's-nonaktif'}`}>{u.aktif ? 'Aktif' : 'Nonaktif'}</span></td>
                   <td className="actions">

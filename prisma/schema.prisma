@@ -18,7 +18,6 @@ enum Peran {
   dps
   kadep_dps
   upt
-  pengajar
 }
 
 enum JenisLayanan {
@@ -87,8 +86,9 @@ model Unit {
   kode  String @unique @db.VarChar(8)
   nama  String @unique @db.VarChar(100)
 
-  users  User[]
-  orders Order[]
+  users    User[]
+  pengajar Pengajar[]
+  orders   Order[]
 
   @@map("unit")
 }
@@ -100,23 +100,37 @@ model User {
   passwordHash String   @db.VarChar(255)
   peran        Peran
   jabatan      String   @db.VarChar(100)
-  /// UPT/Prodi asal (untuk peran upt dan pengajar internal).
+  /// UPT/Prodi asal (untuk peran upt).
   unitId       Int?
-  /// Pengajar dari luar Politeknik Astra.
-  eksternal    Boolean  @default(false)
   aktif        Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   unit       Unit?               @relation(fields: [unitId], references: [id])
   orders     Order[]             @relation("OrderMarketing")
   riwayat    RiwayatOrder[]
-  penugasan  PenugasanPengajar[]
   jadwalLog  JadwalLog[]
   approval1  Spk[]               @relation("Approval1")
   approval2  Spk[]               @relation("Approval2")
   notifikasi Notifikasi[]
 
   @@map("users")
+}
+
+/// Pengajar/instruktur sebagai data master (tidak login). Kesediaan dikonfirmasi lewat DPS.
+model Pengajar {
+  id        Int     @id @default(autoincrement())
+  nama      String  @db.VarChar(100)
+  jabatan   String  @db.VarChar(100)
+  /// UPT/Prodi asal; kosong untuk pengajar eksternal.
+  unitId    Int?
+  eksternal Boolean @default(false)
+  telepon   String? @db.VarChar(30)
+  aktif     Boolean @default(true)
+
+  unit      Unit?               @relation(fields: [unitId], references: [id])
+  penugasan PenugasanPengajar[]
+
+  @@map("pengajar")
 }
 
 model Customer {
@@ -317,7 +331,7 @@ model PenugasanPengajar {
   dibuatPada      DateTime       @default(now())
 
   order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  pengajar User  @relation(fields: [pengajarId], references: [id])
+  pengajar Pengajar @relation(fields: [pengajarId], references: [id])
 
   @@unique([orderId, pengajarId])
   @@map("penugasan_pengajar")

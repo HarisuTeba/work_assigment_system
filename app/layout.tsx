@@ -8,8 +8,8 @@ const sans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600
 const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['500'], variable: '--f-mono', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: { default: 'Sistem SPK Direktorat 3', template: '%s · Sistem SPK' },
-  description: 'Monitoring order SPK Eksternal Direktorat 3: RFQ, Silabus & RAK, Quotation, SPK dengan approval berjenjang, operasional DPS, dan BAST.',
+  title: { default: 'Sistem SPK', template: '%s · Sistem SPK' },
+  description: 'Sistem pengelolaan Surat Perintah Kerja.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

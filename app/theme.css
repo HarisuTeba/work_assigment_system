@@ -309,3 +309,7 @@ h3.sub { border-top: 0; margin-top: var(--space-md); color: var(--color-accent-2
 .kosong-hal { min-height: 100vh; display: grid; place-items: center; padding: var(--space-md); background: var(--color-paper); }
 .kosong-hal .card { max-width: 440px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-xs); padding: var(--space-xl) var(--space-lg); }
 .kosong-kode { font-size: 3.5rem; font-weight: 800; line-height: 1; background: linear-gradient(135deg, var(--color-accent), var(--color-cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Login ringkas: hanya identitas aplikasi, tanpa rincian alur */
+.login-intro { justify-content: center; }
+.login-intro .wordmark { border-bottom: 0; padding: 0; margin-bottom: var(--space-md); }

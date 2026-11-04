@@ -50,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <Shell
       nav={nav}
-      wordmark={<Link href={beranda(u.peran)} className="wordmark"><span className="wm-logo" aria-hidden>D3</span><span><strong>Sistem SPK</strong><small>Direktorat 3 · Industrial Service</small></span></Link>}
+      wordmark={<Link href={beranda(u.peran)} className="wordmark"><span className="wm-logo" aria-hidden>S</span><span><strong>Sistem SPK</strong><small>Surat Perintah Kerja</small></span></Link>}
       foot={
         <>
           <Link href="/profil" className="nav-item">Profil & password</Link>
